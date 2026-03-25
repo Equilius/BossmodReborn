@@ -8,7 +8,9 @@
 //  - FireFlight:
 //        - find out who gets the stack
 //        - Add Enums value for left and right instead of using side number int
-//  - WheelOfFableFlight - find out who gets the stack
+//  - WheelOfFableFlight:
+//      - find out who gets the stack
+//      - Add initial AOE for the cleaves
 //  - Fix hints for witch hunt - currently says "Stack" "Bait" etc at the same time - most likely just disable for now until priority is added
 //  - Improve visual for SpurningFlames? - Really not needed, but could add indictors on the direction to go instead of showing the AOEs (assumes BD)
 //  - Pari's Curse - Mechanic works fine, just a lot of stuff for solving it - Remove gridMap if possible and find a different way to do it
