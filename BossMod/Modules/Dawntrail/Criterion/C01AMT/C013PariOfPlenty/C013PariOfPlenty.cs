@@ -5,7 +5,6 @@
 //  - Pari's Curse - Add stack/spread AOEs?
 //  - Towers add cleaves
 //  - Improve text hints on some mechanics
-//  - Change colour on WheelOfFableFlight - hard to see spreads/stacks currently
 //  - FireFlight:
 //        - find out who gets the stack
 //        - Add Enums value for left and right instead of using side number int
