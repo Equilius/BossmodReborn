@@ -2,67 +2,6 @@
 
 sealed class LightOfJudgment(BossModule module) : Components.RaidwideCast(module, (uint)AID.LightOfJudgment);
 
-sealed class GravenImage(BossModule module) : Components.GenericKnockback(module, (uint)AID.PulseWave)
-{
-    private readonly List<(ulong SourceID, int slot)> tethers = [];
-    private readonly List<Knockback> knockbacks = [];
-
-    public override void OnTethered(Actor source, in ActorTetherInfo tether)
-    {
-        if (tether.ID != (uint)TetherID.GravenImageTether)
-        {
-            return;
-        }
-
-        var target = WorldState.Actors.Find(tether.Target);
-        if (target == null)
-        {
-            return;
-        }
-
-        var slot = Raid.FindSlot(tether.Target);
-        if (slot < 0)
-        {
-            return;
-        }
-
-        tethers.Add((source.InstanceID, slot));
-    }
-
-    public override void OnEventCast(Actor caster, ActorCastEvent spell)
-    {
-        if (spell.Action.ID == (uint)AID.PulseWave)
-        {
-            NumCasts++;
-            tethers.Clear();
-        }
-    }
-
-    public override ReadOnlySpan<Knockback> ActiveKnockbacks(int slot, Actor actor)
-    {
-        knockbacks.Clear();
-
-        foreach (var target in tethers)
-        {
-            if (target.slot != slot)
-            {
-                continue;
-            }
-
-            var source = WorldState.Actors.Find(target.SourceID);
-            if (source == null)
-            {
-                continue;
-            }
-
-            knockbacks.Add(new(source.Position, 14f, actorID: source.InstanceID));
-            return CollectionsMarshal.AsSpan(knockbacks);
-        }
-
-        return CollectionsMarshal.AsSpan(knockbacks);
-    }
-}
-
 sealed class StackSpreadOrbs(BossModule module) : Components.UniformStackSpread(module, 6f, 5f, 4, 4)
 {
     private bool? spread = null;

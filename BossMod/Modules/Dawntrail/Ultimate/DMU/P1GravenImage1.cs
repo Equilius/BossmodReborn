@@ -1,5 +1,36 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
+// TODO add AI hints
+sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, (uint)AID.PulseWave) {
+    private const float KnockbackDistance = 13.0f;
+    private BitMask affectedPlayers;
+    private DateTime activation;
+    private Actor? tetherSource = null; // Could also just use a set WPos since all tethers come from the same location
+
+    public override void OnTethered(Actor source, in ActorTetherInfo tether) {
+        if (tether.ID == (uint)TetherID.GravenImageTether && Raid.FindSlot(tether.Target) is var slot && slot >= 0) {
+            tetherSource = source;
+            affectedPlayers[slot] = true;
+            activation = WorldState.FutureTime(5.0f);
+        }
+    }
+
+    public override void OnUntethered(Actor source, in ActorTetherInfo tether) {
+        if (tether.ID == (uint)TetherID.GravenImageTether && Raid.FindSlot(tether.Target) is var slot && slot >= 0) {
+            affectedPlayers[slot] = false;
+            NumCasts++;
+        }
+    }
+
+    public override ReadOnlySpan<Knockback> ActiveKnockbacks(int slot, Actor actor) {
+        if (affectedPlayers[slot] && tetherSource != null) {
+            return new Knockback[1] { new(tetherSource.Position, KnockbackDistance, activation, ignoreImmunes: true) };
+        }
+
+        return [];
+    }
+}
+
 /*
 
  Requirements:
@@ -10,13 +41,6 @@
     - e.g. OT & M2 are the same spots just on different sides? - like
 - A function to calculate the KB distance to correctly assign with the spot - you also have a small time to adjust which could be considered
     - can be used for the knockback players as a hint of where to stand
-
-- A coordinate system could be I guess would be set distances, e.g. OT & M2
-    - H2 at wall, H1 middle of safe spot, OT west of boss, MT N/S of boss
-        - H2 solver would be 19.0f away from boss going west, then 1.0f down or up depending on safe zone
-        - H1 solver would be 10.0f away from boss going west, then 10.0f down or up depedning on safe zone
-        - Each strat would need different maths for the logic of where the point should be
-            - Which would result in a large codebase of similar code for each different strat to apply the maths
 
 - Another coordinate system could be set positions in a data model with the assignment of the player like OT
     - Might mean we have to store 2x spots for each player as it can be north or south which would be 16 in total

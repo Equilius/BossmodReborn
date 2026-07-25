@@ -653,12 +653,12 @@ sealed class DMUStates : StateMachineBuilder
     void Phase1GravenImage(uint id, float delay)
     {
         Cast(id + 0x10, (uint)AID.GravenImage, delay, 3.0f, "Graven Image")
-            .ActivateOnEnter<GravenImage>()
+            .ActivateOnEnter<PulseWave>()
             .ActivateOnEnter<BlizzardSafeSpots>()
             .ActivateOnEnter<StackSpreadOrbs>();
         CastStart(id + 0x20, (uint)AID.MysteryMagic, 3.2f);
-        ComponentCondition<GravenImage>(id + 0x30, 2.6f, static o => o.NumCasts > 0, "Knockbacks")
-            .DeactivateOnExit<GravenImage>();
+        ComponentCondition<PulseWave>(id + 0x30, 2.6f, static o => o.NumCasts == 4, "Knockbacks")
+            .DeactivateOnExit<PulseWave>();
         ComponentCondition<BlizzardSafeSpots>(id + 0x40, 2.3f, static o => o.NumCasts > 0, "Blizzard safe spots")
             .DeactivateOnExit<BlizzardSafeSpots>();
 
