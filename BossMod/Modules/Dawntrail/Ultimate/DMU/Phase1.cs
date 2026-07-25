@@ -1,63 +1,6 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-sealed class RevoltingRuinIII(BossModule module) : Components.GenericBaitAway(module, (uint)AID.RevoltingRuinIII, tankbuster: true, damageType: AIHints.PredictedDamageType.Tankbuster)
-{
-    private Actor? source; // If this ever becomes null, it means the mechanic has not started, or it has ended
-    private Actor? target;
-    private DateTime activation;
-    private bool secondTB = false;
-
-    public override void Update()
-    {
-        CurrentBaits.Clear();
-        if (source == null)
-        {
-            return;
-        }
-
-        Actor? target;
-        if (secondTB)
-        {
-            var byEnmity = RaidByEnmity(source, true);
-            target = byEnmity.Count > 1 ? byEnmity[1] : null;
-        }
-        else
-        {
-            target = this.target;
-        }
-        if (target != null)
-        {
-            CurrentBaits.Add(new(source, target, new AOEShapeCone(30f, 45f.Degrees()), activation));
-        }
-    }
-
-    public override void OnCastStarted(Actor caster, ActorCastInfo spell)
-    {
-        if (spell.Action.ID == (uint)AID.RevoltingRuinIII)
-        {
-            source = caster;
-            target = WorldState.Actors.Find(spell.TargetID);
-            activation = Module.CastFinishAt(spell);
-        }
-    }
-
-    public override void OnEventCast(Actor caster, ActorCastEvent spell)
-    {
-        if (spell.Action.ID == (uint)AID.RevoltingRuinIII)
-        {
-            NumCasts++;
-            secondTB = true;
-            activation = WorldState.FutureTime(0.3f);
-        }
-
-        if (spell.Action.ID == (uint)AID.RevoltingRuinIII1)
-        {
-            NumCasts++;
-            source = null;
-            CurrentBaits.Clear();
-        }
-    }
-}
+sealed class LightOfJudgment(BossModule module) : Components.RaidwideCast(module, (uint)AID.LightOfJudgment);
 
 sealed class GravenImage(BossModule module) : Components.GenericKnockback(module, (uint)AID.PulseWave)
 {

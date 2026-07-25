@@ -1,7 +1,5 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-sealed class LightOfJudgment(BossModule module) : Components.RaidwideCast(module, (uint)AID.LightOfJudgment);
-
 [ModuleInfo(BossModuleInfo.Maturity.WIP,
     StatesType = typeof(DMUStates),
     ConfigType = typeof(DMUConfig),
@@ -23,9 +21,6 @@ sealed class LightOfJudgment(BossModule module) : Components.RaidwideCast(module
 public sealed class DMU(WorldState ws, Actor primary) : BossModule(ws, primary, new(100f, 100f), new ArenaBoundsCircle(20f))
 {
     public override bool ShouldPrioritizeAllEnemies => true;
-
-    //private Actor? bossP1;
-    public Actor? BossP1() => PrimaryActor;
 
     private Actor? bossP2;
     public Actor? BossP2() => bossP2;

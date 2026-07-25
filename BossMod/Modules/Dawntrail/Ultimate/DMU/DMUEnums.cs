@@ -47,14 +47,17 @@ public enum OID : uint
     FireTower = 0x1EC03E, // R0.500, x0 (spawn during fight), EventObj type
 }
 
-public enum AID : uint
-{
+public enum AID : uint {
     // Phase 1
-    AutoAttack = 49746, // Kefka->player, no cast, single-target
-    Ability = 50173, // Kefka->location, no cast, single-target
+    P1AutoAttack = 49746, // Kefka->player, no cast, single-target
+    P1Teleport = 50173, // Kefka->location, no cast, single-target
 
-    RevoltingRuinIII = 50179, // Kefka->self/players, 5.0s cast, range 100 ?-degree cone
-    RevoltingRuinIII1 = 50401, // Kefka->self, no cast, range 100 ?-degree cone
+    RevoltingRuinIIIFirstHit = 50179, // Kefka->self/players, 5.0s cast, range 100 150-degree cone
+    RevoltingRuinIIISecondHit = 50401, // Kefka->self, no cast, range 100 150-degree cone
+
+    // TODO
+
+
 
     GravenImage = 48370, // Kefka->self, 3.0s cast, single-target
     PulseWave = 47785, // 4C31->player, no cast, single-target
@@ -365,10 +368,11 @@ public enum SID : uint
     LightningResistanceDownII = 2998, // Helper->player, extra=0x0 - Used for TB in other phases as well
 }
 
-public enum IconID : uint
-{
+public enum IconID : uint {
     // Phase 1
-    TankIcon = 218, // player->self
+    TankBuster = 218, // player->self
+
+    // TODO OLD
     spreadIcon = 127, // player->self // Spread
     stackIcon = 128, // player->self // Stack
     FireRingQuestionMark = 673, // Kefka->self // Questionmark - 2A1
