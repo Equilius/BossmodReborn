@@ -83,40 +83,24 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
             return;
         }
 
-        if (mechanic == SpreadStack.None) {
+        var spots = mechanic switch {
+            SpreadStack.Spread => P1GravenImage1Data.SpreadSafeSpots.GetValueOrDefault(assignment),
+            SpreadStack.Stack => P1GravenImage1Data.StackSafeSpots.GetValueOrDefault(pc.Role),
+            _ => default,
+        };
+
+        if (spots == default) {
             return;
         }
 
-        var northSafe = pc.Role == Role.Tank || pc.Role == Role.Healer ? blizzardSafeSpots.supportNorth : blizzardSafeSpots.dpsNorth;
+        var northSafe = pc.Role is Role.Tank or Role.Healer ? blizzardSafeSpots.supportNorth : blizzardSafeSpots.dpsNorth;
+        var safeSpot = northSafe.Value ? spots.north : spots.south;
 
-        if (mechanic == SpreadStack.Spread) {
-            if (!P1GravenImage1Data.SpreadSafeSpots.TryGetValue(assignment, out var spots)) {
-                return;
-            }
-
-            var safeSpot = northSafe.Value ? spots.north : spots.south;
-
-            if (PulseWave.affectedPlayers[pcSlot] && dmuConfig.P1GravenImage1KnockbackAdditionalHints) {
-                Arena.AddCircle(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, Colors.Safe, 2.0f);
-                Arena.AddCircle(safeSpot, 1.0f, Colors.Danger, 2.0f);
-            } else {
-                Arena.AddCircle(safeSpot, 1.0f, Colors.Safe, 2.0f);
-            }
-        }
-
-        if (mechanic == SpreadStack.Stack) {
-            if (!P1GravenImage1Data.StackSafeSpots.TryGetValue(pc.Role, out var spots)) {
-                return;
-            }
-
-            var safeSpot = northSafe.Value ? spots.north : spots.south;
-
-            if (PulseWave.affectedPlayers[pcSlot] && dmuConfig.P1GravenImage1KnockbackAdditionalHints) {
-                Arena.AddCircle(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, Colors.Safe, 2.0f);
-                Arena.AddCircle(safeSpot, 1.0f, Colors.Danger, 2.0f);
-            } else {
-                Arena.AddCircle(safeSpot, 1.0f, Colors.Safe, 2.0f);
-            }
+        if (PulseWave.affectedPlayers[pcSlot] && dmuConfig.P1GravenImage1KnockbackAdditionalHints) {
+            Arena.AddCircle(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, Colors.Safe, 2.0f);
+            Arena.AddCircle(safeSpot, 1.0f, Colors.Danger, 2.0f);
+        } else {
+            Arena.AddCircle(safeSpot, 1.0f, Colors.Safe, 2.0f);
         }
     }
 
