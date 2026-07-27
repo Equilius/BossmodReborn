@@ -5,7 +5,6 @@
 //  2. What happens if supports & dps swap sides in the future? - BlizzardSafeSpots, FlagrantFire, PulseWave should consider this
 //  3. Improve spreads / stack adjustments - After every has resolved ~0.9 seconds until spreads / stack resolve, have time to adjust if needed
 
-// TODO positions for AIHints and drawning are done twice
 // TODO clean up component sharing - its messy everything sharing with each other, should use state machine instead
 
 sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, (uint)AID.PulseWave) {
@@ -72,8 +71,7 @@ sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, 
     }
 }
 
-// TODO update name at some point - will need to check over P4 as well
-sealed class BlizzardSafeSpots(BossModule module) : Components.SimpleAOEGroups(module, [(uint)AID.BlizzardIIIBlowout, (uint)AID.BlizzardIIIBlowout1],
+sealed class BlizzardIIIBlowout(BossModule module) : Components.SimpleAOEGroups(module, [(uint)AID.BlizzardIIIBlowout, (uint)AID.BlizzardIIIBlowout1],
     new AOEShapeCone(40f, 45f.Degrees())) {
     public bool? supportNorth = null;
     public bool? dpsNorth = null;
@@ -111,51 +109,9 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
     private SpreadStack mechanic = SpreadStack.None;
     private TellingTheTruth tellingTheTruth = TellingTheTruth.Unknown;
     private readonly PulseWave? PulseWave = module.FindComponent<PulseWave>();
-    private readonly BlizzardSafeSpots? blizzardSafeSpots = module.FindComponent<BlizzardSafeSpots>();
+    private readonly BlizzardIIIBlowout? blizzardSafeSpots = module.FindComponent<BlizzardIIIBlowout>();
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
     private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
-
-    public override void DrawArenaForeground(int pcSlot, Actor pc) {
-        base.DrawArenaForeground(pcSlot, pc);
-
-        if (dmuConfig.P1GravenImage1 == DMUConfig.P1GravenImage1Strategy.GravenImage1None) {
-            return;
-        }
-
-        var slots = partyConfig.SlotsPerAssignment(Raid);
-        if (slots.Length == 0) {
-            return;
-        }
-        var assignment = partyConfig[Raid.Members[pcSlot].ContentId];
-
-        if (PulseWave == null || PulseWave.tetherSource == null) {
-            return;
-        }
-
-        if (blizzardSafeSpots == null || blizzardSafeSpots.dpsNorth == null || blizzardSafeSpots.supportNorth == null) {
-            return;
-        }
-
-        var spots = mechanic switch {
-            SpreadStack.Spread => P1GravenImage1Data.SpreadSafeSpots.GetValueOrDefault(assignment),
-            SpreadStack.Stack => P1GravenImage1Data.StackSafeSpots.GetValueOrDefault(pc.Role),
-            _ => default,
-        };
-
-        if (spots == default) {
-            return;
-        }
-
-        var northSafe = pc.Role is Role.Tank or Role.Healer ? blizzardSafeSpots.supportNorth : blizzardSafeSpots.dpsNorth;
-        var safeSpot = northSafe.Value ? spots.north : spots.south;
-
-        if (PulseWave.affectedPlayers[pcSlot] && dmuConfig.P1GravenImage1KnockbackAdditionalHints) {
-            Arena.AddCircle(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, Colors.Safe, 2.0f);
-            Arena.AddCircle(safeSpot, 1.0f, Colors.Danger, 2.0f);
-        } else {
-            Arena.AddCircle(safeSpot, 1.0f, Colors.Safe, 2.0f);
-        }
-    }
 
     public override void OnEventIcon(Actor actor, uint iconID, ulong targetID) {
         switch ((IconID)iconID) {
@@ -187,33 +143,71 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
         }
     }
 
+    public override void DrawArenaForeground(int pcSlot, Actor pc) {
+        base.DrawArenaForeground(pcSlot, pc);
+
+        if (PulseWave == null || PulseWave.tetherSource == null) {
+            return;
+        }
+
+        var safeSpot = SafeSpot(pcSlot, pc);
+        if (safeSpot == default) {
+            return;
+        }
+
+        if (PulseWave.affectedPlayers[pcSlot] && dmuConfig.P1GravenImage1KnockbackAdditionalHints) {
+            Arena.AddCircle(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, Colors.Safe, 2.0f);
+            Arena.AddCircle(safeSpot, 1.0f, Colors.Danger, 2.0f);
+        } else {
+            Arena.AddCircle(safeSpot, 1.0f, Colors.Safe, 2.0f);
+        }
+    }
+
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
         if (PulseWave == null || PulseWave.tetherSource == null) {
             return;
         }
 
-        if (blizzardSafeSpots == null || blizzardSafeSpots.dpsNorth == null || blizzardSafeSpots.supportNorth == null) {
+        var safeSpot = SafeSpot(slot, actor);
+        if (safeSpot == default) {
             return;
         }
-
-        var spots = mechanic switch {
-            SpreadStack.Spread => P1GravenImage1Data.SpreadSafeSpots.GetValueOrDefault(assignment),
-            SpreadStack.Stack => P1GravenImage1Data.StackSafeSpots.GetValueOrDefault(actor.Role),
-            _ => default,
-        };
-
-        if (spots == default) {
-            return;
-        }
-
-        var northSafe = actor.Role is Role.Tank or Role.Healer ? blizzardSafeSpots.supportNorth : blizzardSafeSpots.dpsNorth;
-        var safeSpot = northSafe.Value ? spots.north : spots.south;
 
         if (PulseWave.affectedPlayers[slot]) {
             hints.GoalZones.Add(AIHints.GoalSingleTarget(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, 50.0f));
         } else {
             hints.GoalZones.Add(AIHints.GoalSingleTarget(safeSpot, 1.0f, 50.0f));
         }
+    }
+
+    // Pulls the data spot for the player
+    private WPos SafeSpot(int pcSlot, Actor pc) {
+        if (dmuConfig.P1GravenImage1 == DMUConfig.P1GravenImage1Strategy.GravenImage1None) {
+            return default;
+        }
+
+        var slots = partyConfig.SlotsPerAssignment(Raid);
+        if (slots.Length == 0) {
+            return default;
+        }
+        var assignment = partyConfig[Raid.Members[pcSlot].ContentId];
+
+        if (blizzardSafeSpots == null || blizzardSafeSpots.dpsNorth == null || blizzardSafeSpots.supportNorth == null) {
+            return default;
+        }
+
+        var spots = mechanic switch {
+            SpreadStack.Spread => P1GravenImage1Data.SpreadSafeSpots.GetValueOrDefault(assignment),
+            SpreadStack.Stack => P1GravenImage1Data.StackSafeSpots.GetValueOrDefault(pc.Role),
+            _ => default,
+        };
+
+        if (spots == default) {
+            return default;
+        }
+
+        var northSafe = pc.Role is Role.Tank or Role.Healer ? blizzardSafeSpots.supportNorth : blizzardSafeSpots.dpsNorth;
+        return northSafe.Value ? spots.north : spots.south;
     }
 
     // Used to correctly assign what the mechanic is out of all the possible cases
