@@ -1,16 +1,15 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-// TODO improvements: Melee uptime for the KB? - Have a small time to adjust to the correct spot afterwards
-//  What happens if supports & dps swap strat in the future? - BlizzardSafeSpots & FlagrantFire should consider this
+// TODO
+//  1. Melee uptime for the knockback - Have a small time to adjust to the correct spot afterwards
+//  2. What happens if supports & dps swap sides in the future? - BlizzardSafeSpots, FlagrantFire, PulseWave should consider this
+//  3. Improve spreads / stack adjustments - After every has resolved ~0.9 seconds until spreads / stack resolve, have time to adjust if needed
 
-/*
- add line in-game hints like m11s
-Add warning to module saying if the module is not configured correctly or not - this is only when the module is loaded, when combat starts it will go away
-	- check party roles
- */
+// TODO positions for AIHints and drawning are done twice
+// TODO clean up component sharing - its messy everything sharing with each other, should use state machine instead
 
-// TODO add AI hints
 sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, (uint)AID.PulseWave) {
+    public bool active = false;
     private DateTime activation;
     public const float KnockbackDistance = 13.0f;
     public BitMask affectedPlayers;
@@ -21,6 +20,7 @@ sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, 
             tetherSource = source;
             affectedPlayers[slot] = true;
             activation = WorldState.FutureTime(5.0f);
+            active = true;
         }
     }
 
@@ -28,6 +28,10 @@ sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, 
         if (tether.ID == (uint)TetherID.GravenImageTether && Raid.FindSlot(tether.Target) is var slot && slot >= 0) {
             affectedPlayers[slot] = false;
             NumCasts++;
+
+            if (NumCasts == 4) {
+                active = false;
+            }
         }
     }
 
@@ -38,14 +42,42 @@ sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, 
 
         return [];
     }
+
+    public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
+        if (!active) {
+            return;
+        }
+
+        // Case: Non-tethered players will stand middle of their side
+        if (!affectedPlayers[slot]) {
+            if (actor.Role is Role.Tank or Role.Healer) {
+                hints.GoalZones.Add(AIHints.GoalSingleTarget(new WPos(96.000f, 100.000f), 2.0f, 5.0f));
+            }
+
+            if (actor.Role is Role.Melee or Role.Ranged) {
+                hints.GoalZones.Add(AIHints.GoalSingleTarget(new WPos(104.000f, 100.000f), 2.0f, 5.0f));
+            }
+        }
+
+        // Case: Tethered players will stand middle of their side, but slightly north
+        if (affectedPlayers[slot]) {
+            if (actor.Role is Role.Tank or Role.Healer) {
+                hints.GoalZones.Add(AIHints.GoalSingleTarget(new WPos(96.000f, 94.000f), 2.0f, 5.0f));
+            }
+
+            if (actor.Role is Role.Melee or Role.Ranged) {
+                hints.GoalZones.Add(AIHints.GoalSingleTarget(new WPos(104.000f, 94.000f), 2.0f, 5.0f));
+            }
+        }
+    }
 }
 
 // TODO update name at some point - will need to check over P4 as well
-// TODO add AI hints?
 sealed class BlizzardSafeSpots(BossModule module) : Components.SimpleAOEGroups(module, [(uint)AID.BlizzardIIIBlowout, (uint)AID.BlizzardIIIBlowout1],
     new AOEShapeCone(40f, 45f.Degrees())) {
     public bool? supportNorth = null;
     public bool? dpsNorth = null;
+    private readonly PulseWave? PulseWave = module.FindComponent<PulseWave>();
 
     public override void OnCastStarted(Actor caster, ActorCastInfo spell) {
         base.OnCastStarted(caster, spell);
@@ -55,9 +87,24 @@ sealed class BlizzardSafeSpots(BossModule module) : Components.SimpleAOEGroups(m
             dpsNorth = !Casters.Exists(c => c.Check(new WPos(111.000f, 89.000f)));
         }
     }
+
+    public override void AddHints(int slot, Actor actor, TextHints hints) {
+        // TODO this logic shouldn't be cased to pulseWave, since it happens a lot alot, instead make the state machine turn
+        //  its own active bool value to true after knockback have happened
+        if (PulseWave != null && PulseWave.active == false) {
+            base.AddHints(slot, actor, hints);
+        }
+    }
+
+    public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
+        // TODO this logic shouldn't be cased to pulseWave, since it happens a lot alot, instead make the state machine turn
+        //  its own active bool value to true after knockback have happened
+        if (PulseWave != null && PulseWave.active == false) {
+            base.AddAIHints(slot, actor, assignment, hints);
+        }
+    }
 }
 
-// TODO add AI hints?
 sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(module, 6.0f, 5.0f, 4, 4) {
     private enum SpreadStack { None, Spread, Stack }
     private enum TellingTheTruth { Unknown, Yes, No}
@@ -140,6 +187,35 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
         }
     }
 
+    public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
+        if (PulseWave == null || PulseWave.tetherSource == null) {
+            return;
+        }
+
+        if (blizzardSafeSpots == null || blizzardSafeSpots.dpsNorth == null || blizzardSafeSpots.supportNorth == null) {
+            return;
+        }
+
+        var spots = mechanic switch {
+            SpreadStack.Spread => P1GravenImage1Data.SpreadSafeSpots.GetValueOrDefault(assignment),
+            SpreadStack.Stack => P1GravenImage1Data.StackSafeSpots.GetValueOrDefault(actor.Role),
+            _ => default,
+        };
+
+        if (spots == default) {
+            return;
+        }
+
+        var northSafe = actor.Role is Role.Tank or Role.Healer ? blizzardSafeSpots.supportNorth : blizzardSafeSpots.dpsNorth;
+        var safeSpot = northSafe.Value ? spots.north : spots.south;
+
+        if (PulseWave.affectedPlayers[slot]) {
+            hints.GoalZones.Add(AIHints.GoalSingleTarget(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, 50.0f));
+        } else {
+            hints.GoalZones.Add(AIHints.GoalSingleTarget(safeSpot, 1.0f, 50.0f));
+        }
+    }
+
     // Used to correctly assign what the mechanic is out of all the possible cases
     private void SolveMechanic() {
         if (mechanic == SpreadStack.None || tellingTheTruth == TellingTheTruth.Unknown) {
@@ -197,14 +273,14 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
 
                if (p.Role is Role.Tank or Role.Healer) {
                    if (!addedSupport) {
-                       AddStack(p, WorldState.FutureTime(5.8f), ~allowedSupports);
+                       AddStack(p, WorldState.FutureTime(30.8f), ~allowedSupports);
                        addedSupport = true;
                    }
                }
 
                if (p.Role is Role.Melee or Role.Ranged) {
                    if (!addedDD) {
-                       AddStack(p, WorldState.FutureTime(5.8f), ~allowedDDs);
+                       AddStack(p, WorldState.FutureTime(30.8f), ~allowedDDs);
                        addedDD = true;
                    }
                }
