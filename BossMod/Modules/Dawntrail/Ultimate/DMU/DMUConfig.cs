@@ -5,6 +5,10 @@
 public sealed class DMUConfig : ConfigNode {
 
     // Strategy settings
+    // TODO maybe this should be off by default?
+    [PropertyDisplay("Module warning if party roles assignment are not configured!", tooltip: "The warning will only be displayed before combat starts")]
+    public bool partyRolesWarning = true;
+
     public enum P1GravenImage1Strategy {
         [PropertyDisplay("None")]
         GravenImage1None,

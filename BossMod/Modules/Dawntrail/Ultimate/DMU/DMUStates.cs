@@ -639,6 +639,9 @@ sealed class DMUStates : StateMachineBuilder
     }
 
     void Phase1RevoltingRuinIII(uint id, float delay) {
+        ComponentCondition<Hints>(id + 0x01, 0.5f, static o => !o.active)
+            .DeactivateOnExit<Hints>();
+
         CastStart(id, (uint)AID.RevoltingRuinIIIFirstHit, delay)
             .ActivateOnEnter<RevoltingRuinIIIFirst>()
             .ActivateOnEnter<RevoltingRuinIIISecond>();

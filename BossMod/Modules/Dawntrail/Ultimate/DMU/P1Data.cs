@@ -1,6 +1,7 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
 // TODO come up with a better way of storing data positions
+// TODO function should be able to just pull data positions on strategy so no if loops inside module code - design pattern?
 public class P1GravenImage1Data {
     public static IReadOnlyDictionary<PartyRolesConfig.Assignment, (WPos north, WPos south)> SpreadSafeSpots => spreadSafeSpots;
     public static IReadOnlyDictionary<Role, (WPos north, WPos south)> StackSafeSpots => stackSafeSpots;

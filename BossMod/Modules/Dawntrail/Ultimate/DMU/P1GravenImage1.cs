@@ -3,6 +3,12 @@
 // TODO improvements: Melee uptime for the KB? - Have a small time to adjust to the correct spot afterwards
 //  What happens if supports & dps swap strat in the future? - BlizzardSafeSpots & FlagrantFire should consider this
 
+/*
+ add line in-game hints like m11s
+Add warning to module saying if the module is not configured correctly or not - this is only when the module is loaded, when combat starts it will go away
+	- check party roles
+ */
+
 // TODO add AI hints
 sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, (uint)AID.PulseWave) {
     private DateTime activation;
