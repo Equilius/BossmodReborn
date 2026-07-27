@@ -55,19 +55,18 @@ public enum AID : uint {
     RevoltingRuinIIIFirstHit = 50179, // Kefka->self/players, 5.0s cast, range 100 150-degree cone
     RevoltingRuinIIISecondHit = 50401, // Kefka->self, no cast, range 100 150-degree cone
 
-    // TODO
-
-
-
     GravenImage = 48370, // Kefka->self, 3.0s cast, single-target
     PulseWave = 47785, // 4C31->player, no cast, single-target
-    BlizzardIIIBlowout = 47774, // Helper->self, 5.0s cast, range 40 ?-degree cone
-    BlizzardIIIBlowout1 = 47771, // Helper->self, 5.0s cast, range 40 ?-degree cone - Fake it does nothing
-    BlizzardIIIBlowout2 = 47768, // Helper->self, 5.0s cast, range 40 ?-degree cone
-    BlizzardIIIBlowout3 = 47765, // Kefka->self, 5.0s cast, single-target - Not needed it seems
+
     MysteryMagic = 47764, // Kefka->self, 5.0s cast, single-target
-    FlagrantFireIIIStack = 47779, // Helper->players, no cast, range 6 circle - Stack
+    BlizzardIIIBlowoutBoss = 47765, // Kefka->self, 5.0s cast, single-target
+    BlizzardIIIBlowoutFake = 47771, // Helper->self, 5.0s cast, range 40 90-degree cone - does no damage
+    BlizzardIIIBlowout = 47774, // Helper->self, 5.0s cast, range 40 90-degree cone
+    BlizzardIIIBlowout1 = 47768, // Helper->self, 5.0s cast, range 40 90-degree cone
+    FlagrantFireIIIStack = 47779, // Helper->players, no cast, range 6 circle
     FlagrantFireIIISpread = 47778, // Helper->players, no cast, range 5 circle
+
+    // TODO
 
     WaveCannon = 47784, // 4C31->self, no cast, range 100 width 6 rect
     TowerExplosion = 47786, // Helper->self, 3.0s cast, range 4 circle
@@ -371,16 +370,16 @@ public enum SID : uint
 public enum IconID : uint {
     // Phase 1
     TankBuster = 218, // player->self
+    P1SpreadIcon = 127, // player->self
+    P1StackIcon = 128, // player->self
+    FireRingQuestionMark = 673, // Kefka->self
+    FireRingBlueOrb = 674, // Kefka->self
+    BlueRingQuestionMark = 675, // Kefka->self
+    BlueRingBlueOrb = 676, // Kefka->self
+    PurpleRingQuestionMark = 677, // Kefka->self
+    PurpleRingBlueOrb = 678, // Kefka->self
 
     // TODO OLD
-    spreadIcon = 127, // player->self // Spread
-    stackIcon = 128, // player->self // Stack
-    FireRingQuestionMark = 673, // Kefka->self // Questionmark - 2A1
-    FireRingBlueOrb = 674, // Kefka->self // Blue orb - 2A2
-    BlueRingQuestionMark = 675, // Kefka->self // Questionmark - 2A3
-    BlueRingBlueOrb = 676, // Kefka->self // Blue orb - 2A4
-    PurpleRingQuestionMark = 677, // Kefka->self // Questionmark
-    PurpleRingBlueOrb = 678, // Kefka->self // Blue orb
 
     // Phase 2
     SharedTankBuster = 259, // player->self
@@ -421,10 +420,11 @@ public enum Animations : uint
     TowerExplosion = 65600,
 }
 
-public enum TetherID : uint
-{
+public enum TetherID : uint {
     // Phase 1
     GravenImageTether = 45, // 4C31->player
+
+    // TODO OLD
 
     // Phase 3
     BlackHoleTether = 84, // 4C38->player

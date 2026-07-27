@@ -5,6 +5,17 @@
 public sealed class DMUConfig : ConfigNode {
 
     // Strategy settings
+    public enum P1GravenImage1Strategy {
+        [PropertyDisplay("None")]
+        GravenImage1None,
+
+        [PropertyDisplay("LPDU Graven Image 1")]
+        GravenImage1LPDU,
+    }
+
+    [PropertyDisplay("P1 Graven Image 1 strategy")]
+    public P1GravenImage1Strategy P1GravenImage1 = P1GravenImage1Strategy.GravenImage1None;
+
     public enum P1GravenImage2Strategy {
         [PropertyDisplay("Normal Graven Image 2")]
         GravenImage2Normal,
@@ -47,4 +58,9 @@ public sealed class DMUConfig : ConfigNode {
     // AI Settings
     [PropertyDisplay("P1 RevoltingRuinIII always around true north?", tooltip: "Only used by AI")]
     public bool P1RevoltingRuinIIIAlwaysAroundTrueNorth = true;
+
+    // Debug Settings
+    [PropertyDisplay("P1 Graven Image 1 knockback additional hints", tooltip: "Only used for debugging - H1 & R1 roles will still have to move a fair amount " +
+                                                                              " if north is safe, other roles will only have to do slight adjustments")]
+    public bool P1GravenImage1KnockbackAdditionalHints = false;
 }

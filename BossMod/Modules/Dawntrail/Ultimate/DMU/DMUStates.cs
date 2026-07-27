@@ -655,20 +655,20 @@ sealed class DMUStates : StateMachineBuilder
         Cast(id + 0x10, (uint)AID.GravenImage, delay, 3.0f, "Graven Image")
             .ActivateOnEnter<PulseWave>()
             .ActivateOnEnter<BlizzardSafeSpots>()
-            .ActivateOnEnter<StackSpreadOrbs>();
+            .ActivateOnEnter<FlagrantFire>();
         CastStart(id + 0x20, (uint)AID.MysteryMagic, 3.2f);
-        ComponentCondition<PulseWave>(id + 0x30, 2.6f, static o => o.NumCasts == 4, "Knockbacks")
-            .DeactivateOnExit<PulseWave>();
-        ComponentCondition<BlizzardSafeSpots>(id + 0x40, 2.3f, static o => o.NumCasts > 0, "Blizzard safe spots")
-            .DeactivateOnExit<BlizzardSafeSpots>();
+        ComponentCondition<PulseWave>(id + 0x30, 2.6f, static o => o.NumCasts == 4, "Knockbacks");
+            //.DeactivateOnExit<PulseWave>();
+        ComponentCondition<BlizzardSafeSpots>(id + 0x40, 2.3f, static o => o.NumCasts > 0, "Blizzard safe spots");
+            //.DeactivateOnExit<BlizzardSafeSpots>();
 
-        ComponentCondition<StackSpreadOrbs>(id + 0x40, 0.8f, static o => !o.Active, "Stack / Spread")
-            .DeactivateOnExit<StackSpreadOrbs>()
-            .ActivateOnEnter<WaveCannon>()
+        ComponentCondition<FlagrantFire>(id + 0x40, 0.8f, static o => !o.Active, "Stack / Spread")
+            .DeactivateOnExit<FlagrantFire>()
             .ActivateOnExit<DoubleTroubleTrapKnockback>()
             .ActivateOnExit<DoubleTroubleTrapStacks>();
 
         ComponentCondition<WaveCannon>(id + 0x50, 4.2f, static o => o.NumCasts > 0, "Wave Cannon Spreads")
+            .ActivateOnEnter<WaveCannon>()
             .DeactivateOnExit<WaveCannon>()
             .ActivateOnEnter<WaveCannonTowers>();
 
@@ -755,11 +755,11 @@ sealed class DMUStates : StateMachineBuilder
 
         CastStart(id + 0x280, (uint)AID.MysteryMagic, 7.9f)
             .ActivateOnEnter<LightningSafeSpots>()
-            .ActivateOnEnter<StackSpreadOrbs>();
+            .ActivateOnEnter<FlagrantFire>();
 
         Condition(id + 0x290, 5.0f, () => Module.FindComponent<LightningSafeSpots>()!.NumCasts > 0 && Module.FindComponent<Gaze>()!.NumCasts > 0, "Lightning + Gaze")
             .DeactivateOnExit<LightningSafeSpots>()
-            .DeactivateOnExit<StackSpreadOrbs>()
+            .DeactivateOnExit<FlagrantFire>()
             .DeactivateOnExit<Gaze>();
 
         Targetable(id + 0x1000, false, 11.0f, "Boss disappears");
