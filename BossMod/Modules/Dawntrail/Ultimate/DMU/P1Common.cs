@@ -1,5 +1,17 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
+static class RevoltingRuinIIIAIHints {
+    public static void AddTruthNorthHint(BossModule module, AIHints hints) {
+        var maxMelee = 2.75f; // I think the maxMelee is actually 2.5f, but extra 0.25f for leeway
+        var cleaveNudge = 10.0f; // The amount the player is allowed to move left and right of the north position
+
+        var hitBox = module.PrimaryActor.HitboxRadius;
+        var outerHitBox = hitBox + maxMelee;
+        hints.GoalZones.Add(p => p.InDonutCone(module.PrimaryActor.Position, hitBox, outerHitBox, Angle.AnglesCardinals[2],
+            new Angle(MathF.Atan2(cleaveNudge, outerHitBox))) ? 100.0f : 0.0f);
+    }
+}
+
 sealed class RevoltingRuinIIIFirst(BossModule module) : Components.BaitAwayIcon(module, new AOEShapeCone(100.0f, 60.0f.Degrees()), (uint)IconID.TankBuster,
     (uint)AID.RevoltingRuinIIIFirstHit, centerAtTarget: true, tankbuster: true, damageType: AIHints.PredictedDamageType.Tankbuster) {
     private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
@@ -8,13 +20,7 @@ sealed class RevoltingRuinIIIFirst(BossModule module) : Components.BaitAwayIcon(
         base.AddAIHints(slot, actor, assignment, hints);
 
         if (dmuConfig.P1RevoltingRuinIIIAlwaysAroundTrueNorth && IsBaitTarget(actor)) {
-            var maxMelee = 2.75f; // I think the maxMelee is actually 2.5f, but extra 0.25f for leeway
-            var cleaveNudge = 10.0f; // The amount the player is allowed to move left and right of the north position
-
-            var hitBox = Module.PrimaryActor.HitboxRadius;
-            var outerHitBox = hitBox + maxMelee;
-            hints.GoalZones.Add(p => p.InDonutCone(Module.PrimaryActor.Position, hitBox, outerHitBox, Angle.AnglesCardinals[2],
-                new Angle(MathF.Atan2(cleaveNudge, outerHitBox))) ? 100.0f : 0.0f);
+            RevoltingRuinIIIAIHints.AddTruthNorthHint(Module, hints);
         }
     }
 }
@@ -75,13 +81,7 @@ sealed class RevoltingRuinIIISecond : Components.GenericBaitAway {
             base.AddAIHints(slot, actor, assignment, hints);
 
             if (dmuConfig.P1RevoltingRuinIIIAlwaysAroundTrueNorth && IsBaitTarget(actor)) {
-                var maxMelee = 2.75f; // I think the maxMelee is actually 2.5f, but extra 0.25f for leeway
-                var cleaveNudge = 10.0f; // The amount the player is allowed to move left and right of the north position
-
-                var hitBox = Module.PrimaryActor.HitboxRadius;
-                var outerHitBox = hitBox + maxMelee;
-                hints.GoalZones.Add(p => p.InDonutCone(Module.PrimaryActor.Position, hitBox, outerHitBox, Angle.AnglesCardinals[2],
-                    new Angle(MathF.Atan2(cleaveNudge, outerHitBox))) ? 100.0f : 0.0f);
+                RevoltingRuinIIIAIHints.AddTruthNorthHint(Module, hints);
             }
         }
     }
