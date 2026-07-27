@@ -653,17 +653,19 @@ sealed class DMUStates : StateMachineBuilder
             .DeactivateOnExit<RevoltingRuinIIISecond>();
     }
 
-    void Phase1GravenImage(uint id, float delay)
-    {
+    // .ExecOnExit<FellForces>(a => a.active = true);
+
+    void Phase1GravenImage(uint id, float delay) {
         Cast(id + 0x10, (uint)AID.GravenImage, delay, 3.0f, "Graven Image")
             .ActivateOnEnter<PulseWave>()
-            .ActivateOnEnter<BlizzardIIIBlowout>()
+            .ActivateOnEnter<BlizzardIIIBlowoutGraven1>()
             .ActivateOnEnter<FlagrantFire>();
         CastStart(id + 0x20, (uint)AID.MysteryMagic, 3.2f);
-        ComponentCondition<PulseWave>(id + 0x30, 2.6f, static o => o.NumCasts == 4, "Knockbacks");
-            //.DeactivateOnExit<PulseWave>();
-        ComponentCondition<BlizzardIIIBlowout>(id + 0x40, 2.3f, static o => o.NumCasts > 0, "Blizzard safe spots");
-            //.DeactivateOnExit<BlizzardSafeSpots>();
+        ComponentCondition<PulseWave>(id + 0x30, 2.6f, static o => o.NumCasts == 4, "Knockbacks")
+            .DeactivateOnExit<PulseWave>()
+            .ExecOnExit<BlizzardIIIBlowoutGraven1>(o => o.enabledHints = true);
+        ComponentCondition<BlizzardIIIBlowoutGraven1>(id + 0x40, 2.3f, static o => o.NumCasts > 0, "Blizzard safe spots")
+            .DeactivateOnExit<BlizzardIIIBlowoutGraven1>();
 
         ComponentCondition<FlagrantFire>(id + 0x40, 0.8f, static o => !o.Active, "Stack / Spread")
             .DeactivateOnExit<FlagrantFire>()

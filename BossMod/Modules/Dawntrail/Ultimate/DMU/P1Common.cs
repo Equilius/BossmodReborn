@@ -86,3 +86,6 @@ sealed class RevoltingRuinIIISecond : Components.GenericBaitAway {
         }
     }
 }
+
+class BlizzardIIIBlowout(BossModule module) : Components.SimpleAOEGroups(module, [(uint)AID.BlizzardIIIBlowout, (uint)AID.BlizzardIIIBlowout1],
+    new AOEShapeCone(40f, 45f.Degrees()));

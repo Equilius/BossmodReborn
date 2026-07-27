@@ -4,8 +4,7 @@
 //  1. Melee uptime for the knockback - Have a small time to adjust to the correct spot afterwards
 //  2. What happens if supports & dps swap sides in the future? - BlizzardSafeSpots, FlagrantFire, PulseWave should consider this
 //  3. Improve spreads / stack adjustments - After every has resolved ~0.9 seconds until spreads / stack resolve, have time to adjust if needed
-
-// TODO clean up component sharing - its messy everything sharing with each other, should use state machine instead
+//      Currently spreads will cover up their safe spot, but could be made bigger since nothing else is going off, just need to keep them around that point
 
 sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, (uint)AID.PulseWave) {
     public bool active = false;
@@ -71,11 +70,14 @@ sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, 
     }
 }
 
-sealed class BlizzardIIIBlowout(BossModule module) : Components.SimpleAOEGroups(module, [(uint)AID.BlizzardIIIBlowout, (uint)AID.BlizzardIIIBlowout1],
-    new AOEShapeCone(40f, 45f.Degrees())) {
+// Custom version specially for GravenImage1 to make the player avoid going to the incorrect side as the pathfinder will override everything when the cast
+// has <1.0f left, so this is needed to ensure the player move to their side only (left/right depending on the role)
+sealed class BlizzardIIIBlowoutGraven1 : BlizzardIIIBlowout {
     public bool? supportNorth = null;
     public bool? dpsNorth = null;
-    private readonly PulseWave? PulseWave = module.FindComponent<PulseWave>();
+    public bool enabledHints = false;
+
+    public BlizzardIIIBlowoutGraven1(BossModule module) : base(module) {}
 
     public override void OnCastStarted(Actor caster, ActorCastInfo spell) {
         base.OnCastStarted(caster, spell);
@@ -87,18 +89,24 @@ sealed class BlizzardIIIBlowout(BossModule module) : Components.SimpleAOEGroups(
     }
 
     public override void AddHints(int slot, Actor actor, TextHints hints) {
-        // TODO this logic shouldn't be cased to pulseWave, since it happens a lot alot, instead make the state machine turn
-        //  its own active bool value to true after knockback have happened
-        if (PulseWave != null && PulseWave.active == false) {
+        if (enabledHints) {
             base.AddHints(slot, actor, hints);
         }
     }
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
-        // TODO this logic shouldn't be cased to pulseWave, since it happens a lot alot, instead make the state machine turn
-        //  its own active bool value to true after knockback have happened
-        if (PulseWave != null && PulseWave.active == false) {
+        if (enabledHints) {
             base.AddAIHints(slot, actor, assignment, hints);
+
+            // Case: support players will avoid right side completely
+            if (actor.Role is Role.Tank or Role.Healer) {
+                hints.AddForbiddenZone(new SDCone(new WPos(100.0f, 100.0f), 100.0f, Angle.AnglesCardinals[2].ToDirection().OrthoR().ToAngle(), 90.0f.Degrees()));
+            }
+
+            // Case: damage dealers will avoid left side completely
+            if (actor.Role is Role.Melee or Role.Ranged) {
+                hints.AddForbiddenZone(new SDCone(new WPos(100.0f, 100.0f), 100.0f, Angle.AnglesCardinals[2].ToDirection().OrthoL().ToAngle(), 90.0f.Degrees()));
+            }
         }
     }
 }
@@ -109,7 +117,7 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
     private SpreadStack mechanic = SpreadStack.None;
     private TellingTheTruth tellingTheTruth = TellingTheTruth.Unknown;
     private readonly PulseWave? PulseWave = module.FindComponent<PulseWave>();
-    private readonly BlizzardIIIBlowout? blizzardSafeSpots = module.FindComponent<BlizzardIIIBlowout>();
+    private readonly BlizzardIIIBlowoutGraven1? blizzardSafeSpots = module.FindComponent<BlizzardIIIBlowoutGraven1>();
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
     private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
 
@@ -267,14 +275,14 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
 
                if (p.Role is Role.Tank or Role.Healer) {
                    if (!addedSupport) {
-                       AddStack(p, WorldState.FutureTime(30.8f), ~allowedSupports);
+                       AddStack(p, WorldState.FutureTime(5.8f), ~allowedSupports);
                        addedSupport = true;
                    }
                }
 
                if (p.Role is Role.Melee or Role.Ranged) {
                    if (!addedDD) {
-                       AddStack(p, WorldState.FutureTime(30.8f), ~allowedDDs);
+                       AddStack(p, WorldState.FutureTime(5.8f), ~allowedDDs);
                        addedDD = true;
                    }
                }
