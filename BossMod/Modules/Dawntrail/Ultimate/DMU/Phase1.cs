@@ -2,18 +2,6 @@
 
 sealed class LightOfJudgment(BossModule module) : Components.RaidwideCast(module, (uint)AID.LightOfJudgment);
 
-sealed class WaveCannon(BossModule module) : Components.BaitAwayEveryone(module, module.Enemies((uint)OID.StatueBodyOrb).FirstOrDefault(), new AOEShapeRect(100f, 3f), (uint)AID.WaveCannon)
-{
-    public override void OnEventCast(Actor caster, ActorCastEvent spell)
-    {
-        if (spell.Action.ID == (uint)AID.WaveCannon)
-        {
-            ++NumCasts;
-            CurrentBaits.Clear();
-        }
-    }
-}
-
 sealed class WaveCannonTowers(BossModule module) : Components.CastTowers(module, (uint)AID.TowerExplosion, 4f)
 {
     private readonly DateTime[] magicVulnerability = new DateTime[PartyState.MaxPartySize];

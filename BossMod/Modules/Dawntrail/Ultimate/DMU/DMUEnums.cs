@@ -1,12 +1,13 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-public enum OID : uint
-{
+public enum OID : uint {
     // Phase 1
     Kefka = 0x4C30, // R6.000, x1
     Helper = 0x233C, // R0.500, x37, Helper type
     GravenImage = 0x4C31, // R0.500, x9
-    StatueBodyOrb = 0x1EBFBB, // R0.500, x2, EventObj type
+    StatueWaveCannon = 0x1EBFBB, // R0.500, x2, EventObj type
+
+    // TODO OLD
     PurplePuddles = 0x1EC022, // R0.500, x0 (spawn during fight), EventObj type
     StatuePurpleEye = 0x1EBFBE, // R0.500, x2, EventObj type // Purple eye for sleep
     StatueYellowEye = 0x1EBFBF, // R0.500, x2, EventObj type // Yellow eye for confusion
@@ -66,9 +67,10 @@ public enum AID : uint {
     FlagrantFireIIIStack = 47779, // Helper->players, no cast, range 6 circle
     FlagrantFireIIISpread = 47778, // Helper->players, no cast, range 5 circle
 
+    WaveCannon = 47784, // 4C31->self, no cast, range 100 width 6 rect
+
     // TODO
 
-    WaveCannon = 47784, // 4C31->self, no cast, range 100 width 6 rect
     TowerExplosion = 47786, // Helper->self, 3.0s cast, range 4 circle
     UnmitigatedExplosion = 47787, // Helper->self, no cast, range 100 circle - AOE if tower is missed, we don't care about this
 

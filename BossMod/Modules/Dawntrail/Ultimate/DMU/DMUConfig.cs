@@ -20,6 +20,11 @@ public sealed class DMUConfig : ConfigNode {
     [PropertyDisplay("P1 Graven Image 1 strategy")]
     public P1GravenImage1Strategy P1GravenImage1 = P1GravenImage1Strategy.GravenImage1None;
 
+    [PropertyDisplay("P1 Wave Cannon conga priority", tooltip: "Line order is West to East")]
+    [GroupDetails(["1", "2", "3", "4", "5", "6", "7", "8"])]
+    [GroupPreset("HHTTMMRR", [3, 2, 1, 0, 4, 5, 6, 7])]
+    public GroupAssignmentUnique P1WaveCannonAssignment = new() { Assignments = [3, 2, 1, 0, 4, 5, 6, 7] };
+
     public enum P1GravenImage2Strategy {
         [PropertyDisplay("Normal Graven Image 2")]
         GravenImage2Normal,
