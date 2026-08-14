@@ -653,8 +653,6 @@ sealed class DMUStates : StateMachineBuilder
             .DeactivateOnExit<RevoltingRuinIIISecond>();
     }
 
-    // .ExecOnExit<FellForces>(a => a.active = true);
-
     void Phase1GravenImage(uint id, float delay) {
         Cast(id + 0x10, (uint)AID.GravenImage, delay, 3.0f, "Graven Image")
             .ActivateOnEnter<PulseWave>()
@@ -668,9 +666,9 @@ sealed class DMUStates : StateMachineBuilder
             .DeactivateOnExit<BlizzardIIIBlowoutGraven1>();
 
         ComponentCondition<FlagrantFire>(id + 0x40, 0.8f, static o => !o.Active, "Stack / Spread")
-            .DeactivateOnExit<FlagrantFire>()
-            .ActivateOnExit<DoubleTroubleTrapKnockback>()
-            .ActivateOnExit<DoubleTroubleTrapStacks>();
+            .DeactivateOnExit<FlagrantFire>();
+            //.ActivateOnExit<DoubleTroubleTrapKnockback>()
+            //.ActivateOnExit<DoubleTroubleTrapStacks>();
 
         ComponentCondition<WaveCannon>(id + 0x50, 4.2f, static o => o.NumCasts > 0, "Wave Cannon Spreads")
             .ActivateOnEnter<WaveCannon>()
@@ -684,9 +682,9 @@ sealed class DMUStates : StateMachineBuilder
             .ActivateOnEnter<LightningSafeSpots>()
             .ActivateOnEnter<BlizzardIIIBlowout>();
 
-        ComponentCondition<DoubleTroubleTrapKnockback>(id + 0x80, 1.0f, static o => o.NumCasts > 0, "Stacks + Knockbacks")
-            .DeactivateOnExit<DoubleTroubleTrapStacks>()
-            .DeactivateOnExit<DoubleTroubleTrapKnockback>();
+        ComponentCondition<DoubleTroubleTrapKnockback>(id + 0x80, 1.0f, static o => o.NumCasts > 0, "Stacks + Knockbacks");
+            //.DeactivateOnExit<DoubleTroubleTrapStacks>()
+            //.DeactivateOnExit<DoubleTroubleTrapKnockback>();
 
         ComponentCondition<BlizzardIIIBlowout>(id + 0x90, 3.9f, static o => o.NumCasts > 0, "Blizzard + Lightning safe spots")
             .DeactivateOnExit<LightningSafeSpots>()

@@ -2,39 +2,6 @@
 
 sealed class LightOfJudgment(BossModule module) : Components.RaidwideCast(module, (uint)AID.LightOfJudgment);
 
-sealed class WaveCannonTowers(BossModule module) : Components.CastTowers(module, (uint)AID.TowerExplosion, 4f)
-{
-    private readonly DateTime[] magicVulnerability = new DateTime[PartyState.MaxPartySize];
-
-    public override void OnStatusGain(Actor actor, ref ActorStatus status)
-    {
-        if (status.ID == (uint)SID.MagicVulnerabilityUp)
-        {
-            var slot = Raid.FindSlot(actor.InstanceID);
-            if (slot >= 0)
-            {
-                magicVulnerability[slot] = status.ExpireAt;
-            }
-        }
-    }
-
-    public override void OnCastStarted(Actor caster, ActorCastInfo spell)
-    {
-        base.OnCastStarted(caster, spell);
-
-        if (spell.Action.ID == WatchedAction)
-        {
-            var count = Towers.Count;
-            var towers = CollectionsMarshal.AsSpan(Towers);
-            for (var i = 0; i < count; i++)
-            {
-                towers[i].ForbiddenSoakers = Raid.WithSlot(false, true, true)
-                    .WhereSlot(player => magicVulnerability[player] > Towers[i].Activation).Mask();
-            }
-        }
-    }
-}
-
 class LightningSafeSpots(BossModule module) : Components.GenericAOEs(module)
 {
     protected bool questionMark = false;

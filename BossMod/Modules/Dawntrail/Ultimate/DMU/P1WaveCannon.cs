@@ -72,3 +72,81 @@ sealed class WaveCannon : Components.BaitAwayEveryone {
         hints.GoalZones.Add(AIHints.GoalProximity(safeSpot, 1.0f, 50.0f));
     }
 }
+
+// TODO fix AIHint for when towers overlap - maybe just be corrected in default component
+sealed class WaveCannonTowers(BossModule module) : Components.CastTowers(module, (uint)AID.TowerExplosion, 4.0f) {
+    private readonly DateTime[] debuffs = new DateTime[PartyState.MaxPartySize];
+    private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
+    private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
+
+    public override void OnStatusGain(Actor actor, ref ActorStatus status) {
+        if (status.ID == (uint)SID.MagicVulnerabilityUp) {
+            var slot = Raid.FindSlot(actor.InstanceID);
+            if (slot >= 0) {
+                debuffs[slot] = status.ExpireAt;
+            }
+        }
+    }
+
+    public override void OnCastStarted(Actor caster, ActorCastInfo spell) {
+        base.OnCastStarted(caster, spell);
+
+        if (Towers.Count == 4) {
+            Towers.Sort((t1, t2) => t1.Position.X.CompareTo(t2.Position.X));
+
+            // Case: party assignments are not set up so, we just assign towers base on debuffs
+            var slots = partyConfig.SlotsPerAssignment(Raid);
+            if (slots.Length == 0) {
+                setupDefaultForbiddenPlayers();
+                return;
+            }
+
+            // Case: Party assignment are set up so we can solve it correctly
+            setupSpecificForbiddenPlayers();
+        }
+    }
+
+    private void setupDefaultForbiddenPlayers() {
+        for (int i = 0; i < Towers.Count; i++) {
+            var tower = Towers[i];
+            BitMask forbiddenPlayers = default;
+
+            for (int k = 0; k < debuffs.Length; k++) {
+                var playerDebuff = debuffs[k];
+                if (playerDebuff > tower.Activation) {
+                    forbiddenPlayers.Set(k);
+                }
+            }
+
+            tower.ForbiddenSoakers = forbiddenPlayers;
+            Towers[i] = tower;
+        }
+    }
+
+    private void setupSpecificForbiddenPlayers() {
+        var activation = Towers[0].Activation;
+        List<(int slot, int order)> soakers = [];
+
+        // Find the four players without debuffs
+        for (int i = 0; i < debuffs.Length; i++) {
+            if (debuffs[i] > activation) {
+                continue;
+            }
+
+            var assignment = partyConfig[Raid.Members[i].ContentId];
+            var order = dmuConfig.P1WaveCannonAssignment[assignment];
+            soakers.Add((i, order));
+        }
+
+        soakers.Sort((a, b) => a.order.CompareTo(b.order));
+
+        for (int i = 0; i < Towers.Count && i < soakers.Count; i++) {
+            var tower = Towers[i];
+            var soaker = soakers[i];
+            BitMask forbiddenPlayers = default;
+            forbiddenPlayers.Set(soaker.slot);
+            tower.ForbiddenSoakers = ~forbiddenPlayers;
+            Towers[i] = tower;
+        }
+    }
+}
