@@ -5,6 +5,9 @@ public static class BossModuleInfo
 {
     public enum Maturity
     {
+        [PropertyDisplay("Dummy modules, dev work only.")]
+        Dummy,
+
         [PropertyDisplay("Work in progress; might be incomplete or have severe bugs.")]
         WIP,
 
@@ -70,6 +73,7 @@ public static class BossModuleInfo
         CastrumLacusLitore, // group id is ContentFinderCondition row
         TheDalriada, // group id is ContentFinderCondition row
         TheForkedTowerBlood, // group id is ContentFinderCondition row
+        TheForkedTowerMagic, // group id is ContentFinderCondition row
         ForayFATE, // group id is Fate row
         Quest, // group id is Quest row
         Fate, // group id is Fate row

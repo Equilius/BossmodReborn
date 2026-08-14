@@ -116,6 +116,7 @@ sealed class ReplayDetailsWindow : UIWindow
         ImGui.Checkbox("Override", ref _azimuthOverride);
         _hintsBuilder.Update(_hints, _povSlot, false);
         _rmm.Update(0, false, false);
+        var drawnGauge = false;
         if (_mgr.ActiveModule != null)
         {
             if (_mgr.WorldState.Client.CountdownRemaining != null)
@@ -134,23 +135,18 @@ sealed class ReplayDetailsWindow : UIWindow
                 {
                     var movementDest = pc.Position + new WDir(_hints.ForcedMovement.Value.XZ());
                     _mgr.ActiveModule.Arena.AddLine(pc.Position, movementDest, Colors.FutureVulnerable);
-                    _mgr.ActiveModule.Arena.AddCircle(movementDest, 0.5f, Colors.FutureVulnerable);
+                    _mgr.ActiveModule.Arena.ZoneCircleOutline(movementDest, 0.5f, Colors.FutureVulnerable);
                 }
 
                 var movement = _mgr.ActiveModule.CalculateMovementHintsForRaidMember(_povSlot, pc);
                 foreach (var (from, to, col) in movement)
                 {
                     _mgr.ActiveModule.Arena.AddLine(from, to, (col & 0xffffff) | 0x80000000);
-                    _mgr.ActiveModule.Arena.AddCircle(to, 0.5f, (col & 0xffffff) | 0x80000000);
+                    _mgr.ActiveModule.Arena.ZoneCircleOutline(to, 0.5f, (col & 0xffffff) | 0x80000000);
                 }
             }
 
-            if (_showDebug && _povSlot == 0 && _mgr.WorldState.Party[0] is { } player)
-            {
-                var cursor = ImGui.GetCursorPos();
-                GaugeVisualizer.Instance().Draw(player, _mgr.WorldState.Client);
-                ImGui.SetCursorPos(cursor);
-            }
+            drawnGauge = DrawGauge(true);
 
             var compListSb = new System.Text.StringBuilder();
             var comps = _mgr.ActiveModule.Components;
@@ -173,6 +169,9 @@ sealed class ReplayDetailsWindow : UIWindow
             }
             ImGui.TextUnformatted($"Current state: {_mgr.ActiveModule.StateMachine.ActiveState?.ID:X}, Time since pull: {_mgr.ActiveModule.StateMachine.TimeSinceActivation:f3}, Draw time: {(drawTimerPost - drawTimerPre).TotalMilliseconds:f3}ms, Components: {compList}, Player offset: {povOffsetString}");
         }
+
+        if (!drawnGauge)
+            DrawGauge(false);
 
         if (ImGui.CollapsingHeader("Plan execution"))
         {
@@ -253,6 +252,22 @@ sealed class ReplayDetailsWindow : UIWindow
         {
             ResetPF();
         }
+    }
+
+    private bool DrawGauge(bool inline)
+    {
+        if (_showDebug && _povSlot == 0 && _mgr.WorldState.Party[0] is { } player)
+        {
+            var cursor = ImGui.GetCursorPos();
+            if (inline)
+                ImGui.SameLine();
+            GaugeVisualizer.Instance().Draw(player, _mgr.WorldState.Client);
+            if (inline)
+                ImGui.SetCursorPos(cursor);
+            return true;
+        }
+
+        return false;
     }
 
     private void DrawControlRow()

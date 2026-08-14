@@ -29,7 +29,7 @@ sealed class DebuffTracker(BossModule module) : BossComponent(module)
 
     public Angle[] GetAngles(int slot)
     {
-        if (slot < 0 || slot > 3)
+        if (slot is < 0 or > 3)
             return [];
 
         if (Malefic[slot] == 0)
@@ -59,7 +59,7 @@ sealed class DebuffTracker(BossModule module) : BossComponent(module)
     }
     public Angle[] GetUnsafeAngles(int slot)
     {
-        if (slot < 0 || slot > 3)
+        if (slot is < 0 or > 3)
             return [];
 
         if (Malefic[slot] == 0)
@@ -90,7 +90,7 @@ sealed class DebuffTracker(BossModule module) : BossComponent(module)
 
     public Angle? GetUnyieldingAngle(int slot, bool sourceNorthSouth)
     {
-        if (slot < 0 || slot > 3)
+        if (slot is < 0 or > 3)
             return null;
 
         if (Malefic[slot] == 0)
@@ -110,7 +110,7 @@ sealed class DebuffTracker(BossModule module) : BossComponent(module)
 
     public override void OnStatusGain(Actor actor, ref ActorStatus status)
     {
-        if (status.ID >= (uint)SID.MaleficE && status.ID <= (uint)SID.MaleficNSEW)
+        if (status.ID is >= (uint)SID.MaleficE and <= (uint)SID.MaleficNSEW)
         {
             Malefic[Raid.FindSlot(actor.InstanceID)] = status.ID;
         }
@@ -118,7 +118,7 @@ sealed class DebuffTracker(BossModule module) : BossComponent(module)
 
     public override void OnStatusLose(Actor actor, ref ActorStatus status)
     {
-        if (status.ID >= (uint)SID.MaleficE && status.ID <= (uint)SID.MaleficNSEW)
+        if (status.ID is >= (uint)SID.MaleficE and <= (uint)SID.MaleficNSEW)
         {
             var remaining = (status.ExpireAt - WorldState.CurrentTime).TotalSeconds;
             if (remaining < 2d)
@@ -361,7 +361,7 @@ sealed class MaleficPortent(BossModule module) : Components.CastCounter(module, 
 
             if (!isSafe)
             {
-                Arena.AddCircle(player.Position, 1.5f);
+                Arena.ZoneCircleOutline(player.Position, 1.5f);
             }
         }
         */
@@ -386,7 +386,7 @@ sealed class MaleficPortent(BossModule module) : Components.CastCounter(module, 
                     // with 4man 1st time 2 players are safe to pass
                     if (IsPlayerSafe(player, tether))
                     {
-                        Arena.AddCircle(player.Position, 1.5f);
+                        Arena.ZoneCircleOutline(player.Position, 1.5f);
                     }
                 }
             }
@@ -402,7 +402,7 @@ sealed class MaleficPortent(BossModule module) : Components.CastCounter(module, 
                 if (!isTetherSafe && IsPlayerSafe(pc, tether))
                 {
                     Arena.AddLine(Module.PrimaryActor.Position, player.Position);
-                    Arena.AddCircle(player.Position, 1.5f);
+                    Arena.ZoneCircleOutline(player.Position, 1.5f);
                 }
             }
         }
@@ -578,10 +578,10 @@ sealed class SilentEight(BossModule module) : Components.GenericBaitAway(module)
         if (ActiveBaits.Count == 0)
             return;
 
-        Arena.AddCircle(Arena.Center - new WDir(-18f, -18f), 2f);
-        Arena.AddCircle(Arena.Center - new WDir(-18f, 18f), 2f);
-        Arena.AddCircle(Arena.Center - new WDir(18f, -18f), 2f);
-        Arena.AddCircle(Arena.Center - new WDir(18f, 18f), 2f);
+        Arena.ZoneCircleOutline(Arena.Center - new WDir(-18f, -18f), 2f);
+        Arena.ZoneCircleOutline(Arena.Center - new WDir(-18f, 18f), 2f);
+        Arena.ZoneCircleOutline(Arena.Center - new WDir(18f, -18f), 2f);
+        Arena.ZoneCircleOutline(Arena.Center - new WDir(18f, 18f), 2f);
     }
 }
 

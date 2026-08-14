@@ -90,8 +90,11 @@ public sealed class DMU : BossModule {
         }
     }
 
-    protected override void DrawEnemies(int pcSlot, Actor pc) {
-        switch (StateMachine.ActivePhaseIndex) {
+    protected override void DrawEnemies(int pcSlot, Actor pc)
+    {
+        switch (StateMachine.ActivePhaseIndex)
+        {
+            case -1:
             case 0:
                 Arena.Actor(PrimaryActor);
                 break;

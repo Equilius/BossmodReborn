@@ -6,7 +6,6 @@ sealed class Border(BossModule module) : Components.GenericAOEs(module)
     private AOEInstance[] _aoe = [];
     private static readonly WPos circleCenterNW = new(85.71058f, 91.75f), circleCenterS = new(100f, 116.5f), circleCenterNE = new(114.28942f, 91.75f), arenaCenter = new(100f, 100f);
     private readonly Polygon[] circles = [new(circleCenterNW, 10f, 48), new(circleCenterS, 10f, 48), new(circleCenterNE, 10f, 48)];
-    private readonly Polygon[] baseArena = [new Polygon(arenaCenter, 20f, 128)];
     private readonly RectangleSE[] centerBridge = [new(arenaCenter, circleCenterNW, 4f), new(arenaCenter, circleCenterS, 4f), new(arenaCenter, circleCenterNE, 4f)];
     private readonly List<RectangleSE> activeBridges = [with(3)];
     private readonly List<RectangleSE> disappearingBridges = [with(3)];
@@ -26,7 +25,8 @@ sealed class Border(BossModule module) : Components.GenericAOEs(module)
                     // 0x00800040 - small platforms appear?
                     // 0x08000004 - small platforms disappear?
                     case 0x00020001u: // small plattforms appear preparation
-                        _aoe = [new(new AOEShapeCustom(baseArena, circles), arenaCenter, activation: WorldState.FutureTime(6.8d))];
+                        var center = Arena.Center;
+                        AddAOE(new AOEShapeCustom(center, [new Square(new WPos(100f, 100f), 20f)], circles), WorldState.FutureTime(6.8d), center);
                         break;
                     case 0x00800040u: // small platforms appear
                         _aoe = [];
@@ -35,11 +35,12 @@ sealed class Border(BossModule module) : Components.GenericAOEs(module)
                         Arena.Center = arena.Center;
                         break;
                     case 0x02000100u: // small plattforms disappear prep
-                        _aoe = [new(new AOEShapeCustom([new DonutV(arenaCenter, 20f, 24.5f, 128)]), Arena.Center, activation: WorldState.FutureTime(6.8d))];
+                        var center2 = Arena.Center;
+                        AddAOE(new AOEShapeCustom(center2, [new DonutV(new WPos(100f, 100f), 20f, 24.5f, 128)]), WorldState.FutureTime(6.8d), center2);
                         break;
                     case 0x08000004u: // large platform appears
                         _aoe = [];
-                        var arena2 = new ArenaBoundsCustom(baseArena);
+                        var arena2 = new ArenaBoundsCustom([new Polygon(new WPos(100f, 100f), 20f, 128)]);
                         Arena.Bounds = arena2;
                         Arena.Center = arena2.Center;
                         break;
@@ -103,7 +104,8 @@ sealed class Border(BossModule module) : Components.GenericAOEs(module)
                     {
                         disappearingBridges.Add(bridges[i]);
                     }
-                    _aoe = [new(new AOEShapeCustom(disappearingBridges, circles), Arena.Center, activation: WorldState.FutureTime(5.7d))];
+                    var center = Arena.Center;
+                    AddAOE(new AOEShapeCustom(center, disappearingBridges, circles), WorldState.FutureTime(5.7d), center);
                 }
                 void RemoveBridges(RectangleSE[] bridges)
                 {
@@ -115,6 +117,10 @@ sealed class Border(BossModule module) : Components.GenericAOEs(module)
                     _aoe = [];
                     disappearingBridges.Clear();
                     Arena.Bounds = new ArenaBoundsCustom([.. circles, .. activeBridges]);
+                }
+                void AddAOE(AOEShapeCustom shape, DateTime activation, WPos center)
+                {
+                    _aoe = [new(shape, center, activation: activation, shapeDistance: shape.Distance(center, default))];
                 }
         }
     }
