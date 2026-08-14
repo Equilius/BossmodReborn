@@ -164,10 +164,10 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
         }
 
         if (PulseWave.affectedPlayers[pcSlot] && dmuConfig.P1GravenImage1KnockbackAdditionalHints) {
-            Arena.AddCircle(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, Colors.Safe, 2.0f);
-            Arena.AddCircle(safeSpot, 1.0f, Colors.Danger, 2.0f);
+            Arena.ZoneCircleOutline(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, Colors.Safe, 2.0f);
+            Arena.ZoneCircleOutline(safeSpot, 1.0f, Colors.Danger, 2.0f);
         } else {
-            Arena.AddCircle(safeSpot, 1.0f, Colors.Safe, 2.0f);
+            Arena.ZoneCircleOutline(safeSpot, 1.0f, Colors.Safe, 2.0f);
         }
     }
 
