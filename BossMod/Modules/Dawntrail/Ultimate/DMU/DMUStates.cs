@@ -252,10 +252,10 @@ sealed class DMUStates : StateMachineBuilder
             .DeactivateOnExit<Tsunami>()
             .DeactivateOnExit<TsunamiBaits>()
             .ActivateOnEnter<BlizzardIIIBlowout>()
-            .ActivateOnEnter<P4LightningSafeSpots>();
+            .ActivateOnEnter<LightningSafeSpots>();
 
         ComponentCondition<LightningSafeSpots>(id + 0x220, 0.5f, static o => o.NumCasts > 0, "Blizzard + Lightning Safe Spots")
-            .DeactivateOnExit<P4LightningSafeSpots>()
+            .DeactivateOnExit<LightningSafeSpots>()
             .DeactivateOnExit<BlizzardIIIBlowout>()
             .DeactivateOnExit<GrandCrossOrder>()
             .DeactivateOnExit<TsunamiInfernoOrder>()
@@ -685,7 +685,9 @@ sealed class DMUStates : StateMachineBuilder
 
         ComponentCondition<DoubleTroubleTrapKnockback>(id + 0x80, 1.0f, static o => o.NumCasts > 0, "Stacks + Knockbacks")
             .DeactivateOnExit<DoubleTroubleTrapStacks>()
-            .DeactivateOnExit<DoubleTroubleTrapKnockback>();
+            .DeactivateOnExit<DoubleTroubleTrapKnockback>()
+            .ExecOnExit<BlizzardIIIBlowout>(static o => o.enabledHints = true)
+            .ExecOnExit<LightningSafeSpots>(static o => o.enabledHints = true);
 
         ComponentCondition<BlizzardIIIBlowout>(id + 0x90, 3.9f, static o => o.NumCasts > 0, "Blizzard + Lightning safe spots")
             .DeactivateOnExit<LightningSafeSpots>()

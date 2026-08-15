@@ -2,68 +2,6 @@
 
 sealed class LightOfJudgment(BossModule module) : Components.RaidwideCast(module, (uint)AID.LightOfJudgment);
 
-class LightningSafeSpots(BossModule module) : Components.GenericAOEs(module)
-{
-    protected bool questionMark = false;
-    private readonly List<(uint AID, AOEInstance AOE)> aoesAvailable = [];
-    public readonly List<AOEInstance> aoes = [];
-
-    public override void OnEventIcon(Actor actor, uint iconID, ulong targetID)
-    {
-        if (iconID == (uint)IconID.PurpleRingQuestionMark)
-        {
-            questionMark = true;
-        }
-        else if (iconID == (uint)IconID.PurpleRingBlueOrb)
-        {
-            questionMark = false;
-        }
-    }
-
-    public override void OnCastStarted(Actor caster, ActorCastInfo spell)
-    {
-        if (spell.Action.ID is ((uint)AID.ThrummingThunderIII) or ((uint)AID.ThrummingThunderIII1) or ((uint)AID.ThrummingThunderIII2))
-        {
-            aoesAvailable.Add((spell.Action.ID, new AOEInstance(new AOEShapeRect(40f, 5f), spell.LocXZ, spell.Rotation, actorID: caster.InstanceID)));
-        }
-    }
-
-    public override void OnEventCast(Actor caster, ActorCastEvent spell)
-    {
-        if (spell.Action.ID is ((uint)AID.ThrummingThunderIII) or ((uint)AID.ThrummingThunderIII1) or ((uint)AID.ThrummingThunderIII2))
-        {
-            ++NumCasts;
-            aoesAvailable.Clear();
-        }
-    }
-
-    public override ReadOnlySpan<AOEInstance> ActiveAOEs(int slot, Actor actor)
-    {
-        aoes.Clear();
-
-        foreach (var currentAOE in aoesAvailable)
-        {
-            if (questionMark)
-            {
-                if (currentAOE.AID == (uint)AID.ThrummingThunderIII2)
-                {
-                    aoes.Add(currentAOE.AOE);
-                }
-            }
-
-            if (!questionMark)
-            {
-                if (currentAOE.AID is ((uint)AID.ThrummingThunderIII) or ((uint)AID.ThrummingThunderIII1))
-                {
-                    aoes.Add(currentAOE.AOE);
-                }
-            }
-        }
-
-        return CollectionsMarshal.AsSpan(aoes);
-    }
-}
-
 sealed class HyperDrive(BossModule module) : Components.GenericBaitAway(module, (uint)AID.Hyperdrive, centerAtTarget: true, tankbuster: true, damageType: AIHints.PredictedDamageType.Tankbuster)
 {
     private DateTime? activation;

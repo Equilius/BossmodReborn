@@ -71,16 +71,14 @@ public enum AID : uint {
     TowerExplosion = 47786, // Helper->self, 3.0s cast, range 4 circle
     UnmitigatedExplosion = 47787, // Helper->self, no cast, range 100 circle
 
-    // TODO
-
-
-
     DoubleTroubleTrap = 47782, // Kefka->self, 3.0s cast, single-target
     DoubleTroubleTrap1 = 47783, // Helper->player, no cast, range 6 circle
 
     ThrummingThunderIII = 47775, // Helper->self, 5.0s cast, range 40 width 10 rect
-    ThrummingThunderIII1 = 47776, // Helper->self, 5.0s cast, range 40 width 10 rect
-    ThrummingThunderIII2 = 47777, // Helper->self, 5.0s cast, range 40 width 10 rect
+    ThrummingThunderIII1 = 47777, // Helper->self, 5.0s cast, range 40 width 10 rect
+    ThrummingThunderIIIFake = 47776, // Helper->self, 5.0s cast, range 40 width 10 rect
+
+    // TODO
 
     LightOfJudgment = 50722, // Kefka->self, 5.0s cast, range 100 circle
     Hyperdrive = 49739, // Kefka->player, no cast, range 5 circle

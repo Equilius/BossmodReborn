@@ -75,7 +75,6 @@ sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, 
 sealed class BlizzardIIIBlowoutGraven1 : BlizzardIIIBlowout {
     public bool? supportNorth = null;
     public bool? dpsNorth = null;
-    public bool enabledHints = false;
 
     public BlizzardIIIBlowoutGraven1(BossModule module) : base(module) {}
 
@@ -88,16 +87,10 @@ sealed class BlizzardIIIBlowoutGraven1 : BlizzardIIIBlowout {
         }
     }
 
-    public override void AddHints(int slot, Actor actor, TextHints hints) {
-        if (enabledHints) {
-            base.AddHints(slot, actor, hints);
-        }
-    }
-
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
-        if (enabledHints) {
-            base.AddAIHints(slot, actor, assignment, hints);
+        base.AddAIHints(slot, actor, assignment, hints);
 
+        if (enabledHints) {
             // Case: support players will avoid right side completely
             if (actor.Role is Role.Tank or Role.Healer) {
                 hints.AddForbiddenZone(new SDCone(new WPos(100.0f, 100.0f), 100.0f, Angle.AnglesCardinals[2].ToDirection().OrthoR().ToAngle(), 90.0f.Degrees()));

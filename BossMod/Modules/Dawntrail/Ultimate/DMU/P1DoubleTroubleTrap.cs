@@ -12,7 +12,6 @@
 //  ACTUALLY -> it would be easier for the players without the debuff to just self-check themselves instead as then it will just resolve on them instead
 //      of potentially affecting the whole group of that side
 
-// TODO disable blizzard + lightning safespots until knockback has resolved -> should have enough time to move -> most likely can just be the default version of them
 sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStackSpread(module, 6.0f, 0.0f, 4, 4) {
     public bool active = false;
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
@@ -90,11 +89,27 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
     }
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
-        if (!active) {
+        if (!active || Stacks.Count == 0) {
             return;
         }
 
-        base.AddAIHints(slot, actor, assignment, hints);
+        WPos safeSpot = default;
+        DateTime activation = Stacks[0].Activation;
+
+        if (IsStackTarget(actor)) {
+            safeSpot = P1DoubleTroubleKnockBackData.StackSafeSpots.GetValueOrDefault(actor.Role).stackDebuff;
+        }
+
+        if (!IsStackTarget(actor)) {
+            safeSpot = P1DoubleTroubleKnockBackData.StackSafeSpots.GetValueOrDefault(actor.Role).stackHelper;
+        }
+
+
+        if (safeSpot == default) {
+            return;
+        }
+
+        hints.AddForbiddenZone(new SDInvertedCircle(safeSpot, 1.0f), activation);
     }
 
     public override PlayerPriority CalcPriority(int pcSlot, Actor pc, int playerSlot, Actor player, ref uint customColor) {
