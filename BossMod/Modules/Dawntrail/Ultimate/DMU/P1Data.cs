@@ -52,3 +52,18 @@ public class P1WaveCannonData {
         [PartyRolesConfig.Assignment.R2] = new WPos(119.0f, 97.0f),
     };
 }
+
+public class P1DoubleTroubleKnockBackData {
+    public static IReadOnlyDictionary<Role, (WPos stackDebuff, WPos stackHelper)> StackSafeSpots => stackSafeSpots;
+
+    private static readonly Dictionary<Role, (WPos stackDebuff, WPos stackHelper)> stackSafeSpots = new() {
+        [Role.Melee] = (new WPos(107.500f, 100.000f), new  WPos(105.000f, 100.000f)),
+        [Role.Ranged] = (new WPos(107.500f, 100.000f), new  WPos(105.000f, 100.000f)),
+        [Role.Healer] = (new WPos(92.500f, 100.000f), new  WPos(95.000f, 100.000f)),
+        [Role.Tank] = (new WPos(92.500f, 100.000f), new  WPos(95.000f, 100.000f)),
+    };
+}
+
+
+
+

@@ -1,10 +1,5 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-// Knockback
-//  if buff: ensure behind everyone in terms of x coord
-//  if non-buff: ensure in front of stack player in terms of x coord
-//  this only works for first one, other ones will need a custom one as well
-
 sealed class WaveCannon : Components.BaitAwayEveryone {
     private readonly DateTime activation;
     private const float baitActivation = 4.0f;
@@ -55,8 +50,9 @@ sealed class WaveCannon : Components.BaitAwayEveryone {
         }
 
         var remaining = (activation - WorldState.CurrentTime).TotalSeconds;
-        if (remaining <= 1.0f) {
+        if (remaining <= 0.7f) {
             base.AddAIHints(slot, actor, assignment, hints);
+            return;
         }
 
         var slots = partyConfig.SlotsPerAssignment(Raid);
@@ -69,7 +65,7 @@ sealed class WaveCannon : Components.BaitAwayEveryone {
             return;
         }
 
-        hints.GoalZones.Add(AIHints.GoalProximity(safeSpot, 1.0f, 50.0f));
+        hints.AddForbiddenZone(new SDInvertedCircle(safeSpot, 1.0f), activation);
     }
 }
 

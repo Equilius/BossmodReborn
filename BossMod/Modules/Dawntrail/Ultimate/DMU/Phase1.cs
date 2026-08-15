@@ -64,51 +64,6 @@ class LightningSafeSpots(BossModule module) : Components.GenericAOEs(module)
     }
 }
 
-sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStackSpread(module, 6f, 5f, 4, 4)
-{
-    public override void OnStatusGain(Actor actor, ref ActorStatus status)
-    {
-        if (status.ID == (uint)SID.DoubleTroubleTrap)
-        {
-            AddStack(actor, status.ExpireAt);
-        }
-    }
-
-    public override void OnStatusLose(Actor actor, ref ActorStatus status)
-    {
-        if (status.ID == (uint)SID.DoubleTroubleTrap)
-        {
-            Stacks.RemoveAt(0);
-        }
-    }
-}
-
-sealed class DoubleTroubleTrapKnockback(BossModule module) : Components.GenericKnockback(module, (uint)AID.DoubleTroubleTrap1)
-{
-    private readonly List<Knockback> knockbacks = [];
-
-    public override ReadOnlySpan<Knockback> ActiveKnockbacks(int slot, Actor actor)
-    {
-        knockbacks.Clear();
-
-        var stack = Module.FindComponent<DoubleTroubleTrapStacks>();
-        if (stack == null)
-        {
-            return CollectionsMarshal.AsSpan(knockbacks);
-        }
-
-        foreach (var stackPoint in stack.Stacks)
-        {
-            if (actor.Position.InCircle(stackPoint.Target.Position, stackPoint.Radius))
-            {
-                knockbacks.Add(new(stackPoint.Target.Position, 14f, stackPoint.Activation, actorID: stackPoint.Target.InstanceID));
-            }
-        }
-
-        return CollectionsMarshal.AsSpan(knockbacks);
-    }
-}
-
 sealed class HyperDrive(BossModule module) : Components.GenericBaitAway(module, (uint)AID.Hyperdrive, centerAtTarget: true, tankbuster: true, damageType: AIHints.PredictedDamageType.Tankbuster)
 {
     private DateTime? activation;

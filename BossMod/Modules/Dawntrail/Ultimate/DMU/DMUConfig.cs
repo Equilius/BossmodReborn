@@ -28,6 +28,9 @@ public sealed class DMUConfig : ConfigNode {
     [PropertyDisplay("P1 Wave Cannon safe spot hints", tooltip: "Will display roughly where to stand for your bait")]
     public bool P1WaveCannonHints = false;
 
+    [PropertyDisplay("P1 DoubleTrouble Knockback safe spot hints", tooltip: "Will display roughly where to stand for the stack")]
+    public bool P1DoubleTroubleKnockbackHints = false;
+
     public enum P1GravenImage2Strategy {
         [PropertyDisplay("Normal Graven Image 2")]
         GravenImage2Normal,

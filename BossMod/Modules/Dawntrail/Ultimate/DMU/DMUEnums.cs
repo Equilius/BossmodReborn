@@ -68,11 +68,12 @@ public enum AID : uint {
     FlagrantFireIIISpread = 47778, // Helper->players, no cast, range 5 circle
 
     WaveCannon = 47784, // 4C31->self, no cast, range 100 width 6 rect
+    TowerExplosion = 47786, // Helper->self, 3.0s cast, range 4 circle
+    UnmitigatedExplosion = 47787, // Helper->self, no cast, range 100 circle
 
     // TODO
 
-    TowerExplosion = 47786, // Helper->self, 3.0s cast, range 4 circle
-    UnmitigatedExplosion = 47787, // Helper->self, no cast, range 100 circle - AOE if tower is missed, we don't care about this
+
 
     DoubleTroubleTrap = 47782, // Kefka->self, 3.0s cast, single-target
     DoubleTroubleTrap1 = 47783, // Helper->player, no cast, range 6 circle

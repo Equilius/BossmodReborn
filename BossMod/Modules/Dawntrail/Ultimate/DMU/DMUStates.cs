@@ -666,9 +666,9 @@ sealed class DMUStates : StateMachineBuilder
             .DeactivateOnExit<BlizzardIIIBlowoutGraven1>();
 
         ComponentCondition<FlagrantFire>(id + 0x40, 0.8f, static o => !o.Active, "Stack / Spread")
-            .DeactivateOnExit<FlagrantFire>();
-            //.ActivateOnExit<DoubleTroubleTrapKnockback>()
-            //.ActivateOnExit<DoubleTroubleTrapStacks>();
+            .DeactivateOnExit<FlagrantFire>()
+            .ActivateOnExit<DoubleTroubleTrapStacks>()
+            .ActivateOnExit<DoubleTroubleTrapKnockback>();
 
         ComponentCondition<WaveCannon>(id + 0x50, 4.2f, static o => o.NumCasts > 0, "Wave Cannon Spreads")
             .ActivateOnEnter<WaveCannon>()
@@ -676,15 +676,16 @@ sealed class DMUStates : StateMachineBuilder
             .ActivateOnEnter<WaveCannonTowers>();
 
         ComponentCondition<WaveCannonTowers>(id + 0x60, 3.6f, static o => o.NumCasts > 0, "Towers resolve")
-            .DeactivateOnExit<WaveCannonTowers>();
+            .DeactivateOnExit<WaveCannonTowers>()
+            .ExecOnExit<DoubleTroubleTrapStacks>(static o => o.active = true);
 
         CastStart(id + 0x70, (uint)AID.MysteryMagic, 2.7f)
             .ActivateOnEnter<LightningSafeSpots>()
             .ActivateOnEnter<BlizzardIIIBlowout>();
 
-        ComponentCondition<DoubleTroubleTrapKnockback>(id + 0x80, 1.0f, static o => o.NumCasts > 0, "Stacks + Knockbacks");
-            //.DeactivateOnExit<DoubleTroubleTrapStacks>()
-            //.DeactivateOnExit<DoubleTroubleTrapKnockback>();
+        ComponentCondition<DoubleTroubleTrapKnockback>(id + 0x80, 1.0f, static o => o.NumCasts > 0, "Stacks + Knockbacks")
+            .DeactivateOnExit<DoubleTroubleTrapStacks>()
+            .DeactivateOnExit<DoubleTroubleTrapKnockback>();
 
         ComponentCondition<BlizzardIIIBlowout>(id + 0x90, 3.9f, static o => o.NumCasts > 0, "Blizzard + Lightning safe spots")
             .DeactivateOnExit<LightningSafeSpots>()
