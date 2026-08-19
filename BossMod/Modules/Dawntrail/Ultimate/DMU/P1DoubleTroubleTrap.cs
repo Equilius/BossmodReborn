@@ -130,7 +130,7 @@ sealed class DoubleTroubleTrapKnockback(BossModule module) : Components.GenericK
     public override ReadOnlySpan<Knockback> ActiveKnockbacks(int slot, Actor actor) {
         knockbacks.Clear();
 
-        if (doubleTroubleTrapStacks == null || doubleTroubleTrapStacks.Stacks.Count == 0) {
+        if (doubleTroubleTrapStacks == null || !doubleTroubleTrapStacks.active || doubleTroubleTrapStacks.Stacks.Count == 0) {
             return [];
         }
 
