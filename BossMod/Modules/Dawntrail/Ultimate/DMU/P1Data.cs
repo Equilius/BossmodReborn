@@ -13,7 +13,7 @@
 // TODO check over the positions for melee uptime to ensure they keep within range
 
 // TODO add AI settings for pre-positions spots
-// TODO add AI settings for P1GravenImage1 of where support roles go -> this will change the safe spots so most likely not needed
+// TODO add AI settings for P1GravenImage1 of where support roles go -> this will change the safe spots so most likely not need
 
 public class P1GravenImage1Data {
     public static IReadOnlyDictionary<PartyRolesConfig.Assignment, (WPos north, WPos south)> SpreadSafeSpots => spreadSafeSpots;

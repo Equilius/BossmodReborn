@@ -2,7 +2,7 @@
 
 static class RevoltingRuinIIIAIHints {
     public static void AddTruthNorthHint(BossModule module, AIHints hints) {
-        var maxMelee = 2.75f; // I think the maxMelee is actually 2.5f, but extra 0.25f for leeway
+        var maxMelee = 2.5f;
         var cleaveNudge = 10.0f; // The amount the player is allowed to move left and right of the north position
 
         var hitBox = module.PrimaryActor.HitboxRadius;

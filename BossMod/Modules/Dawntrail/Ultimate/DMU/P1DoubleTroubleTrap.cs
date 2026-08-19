@@ -16,6 +16,7 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
     public bool active = false;
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
     private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
+    public int NumCasts = 0;
 
     public override void OnStatusGain(Actor actor, ref ActorStatus status) {
         if (status.ID == (uint)SID.DoubleTroubleTrap) {
@@ -48,6 +49,7 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
     public override void OnStatusLose(Actor actor, ref ActorStatus status) {
         if (status.ID == (uint)SID.DoubleTroubleTrap) {
             Stacks.RemoveAt(0);
+            NumCasts++;
         }
     }
 

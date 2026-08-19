@@ -683,7 +683,7 @@ sealed class DMUStates : StateMachineBuilder
             .ActivateOnEnter<LightningSafeSpots>()
             .ActivateOnEnter<BlizzardIIIBlowout>();
 
-        ComponentCondition<DoubleTroubleTrapKnockback>(id + 0x80, 1.0f, static o => o.NumCasts > 0, "Stacks + Knockbacks")
+        ComponentCondition<DoubleTroubleTrapStacks>(id + 0x80, 1.0f, static o => o.NumCasts == 2, "Stacks + Knockbacks")
             .DeactivateOnExit<DoubleTroubleTrapStacks>()
             .DeactivateOnExit<DoubleTroubleTrapKnockback>()
             .ExecOnExit<BlizzardIIIBlowout>(static o => o.enabledHints = true)

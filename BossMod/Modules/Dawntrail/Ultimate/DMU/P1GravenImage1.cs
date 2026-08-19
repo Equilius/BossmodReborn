@@ -2,9 +2,9 @@
 
 // TODO
 //  1. Melee uptime for the knockback - Have a small time to adjust to the correct spot afterwards
-//  2. What happens if supports & dps swap sides in the future? - BlizzardSafeSpots, FlagrantFire, PulseWave should consider this
-//  3. Improve spreads / stack adjustments - After every has resolved ~0.9 seconds until spreads / stack resolve, have time to adjust if needed
+//  2. Improve spreads / stack adjustments - After every has resolved ~0.9 seconds until spreads / stack resolve, have time to adjust if needed
 //      Currently spreads will cover up their safe spot, but could be made bigger since nothing else is going off, just need to keep them around that point
+//      Will also make stacks work correctly if someone is not within range, but it means in prog parties it will look strange
 
 sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, (uint)AID.PulseWave) {
     public bool active = false;
@@ -49,22 +49,22 @@ sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, 
         // Case: Non-tethered players will stand middle of their side
         if (!affectedPlayers[slot]) {
             if (actor.Role is Role.Tank or Role.Healer) {
-                hints.GoalZones.Add(AIHints.GoalSingleTarget(new WPos(96.000f, 100.000f), 2.0f, 5.0f));
+                hints.GoalZones.Add(p => p.InCircle(new WPos(96.000f, 100.000f), 2.0f) ? 1.5f : 0.0f);
             }
 
             if (actor.Role is Role.Melee or Role.Ranged) {
-                hints.GoalZones.Add(AIHints.GoalSingleTarget(new WPos(104.000f, 100.000f), 2.0f, 5.0f));
+                hints.GoalZones.Add(p => p.InCircle(new WPos(104.000f, 100.000f), 2.0f) ? 1.5f : 0.0f);
             }
         }
 
         // Case: Tethered players will stand middle of their side, but slightly north
         if (affectedPlayers[slot]) {
             if (actor.Role is Role.Tank or Role.Healer) {
-                hints.GoalZones.Add(AIHints.GoalSingleTarget(new WPos(96.000f, 94.000f), 2.0f, 5.0f));
+                hints.GoalZones.Add(p => p.InCircle(new WPos(96.000f, 94.000f), 2.0f) ? 1.5f : 0.0f);
             }
 
             if (actor.Role is Role.Melee or Role.Ranged) {
-                hints.GoalZones.Add(AIHints.GoalSingleTarget(new WPos(104.000f, 94.000f), 2.0f, 5.0f));
+                hints.GoalZones.Add(p => p.InCircle(new WPos(104.000f, 94.000f), 2.0f) ? 1.5f : 0.0f);
             }
         }
     }
@@ -156,11 +156,17 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
             return;
         }
 
-        if (PulseWave.affectedPlayers[pcSlot] && dmuConfig.P1GravenImage1KnockbackAdditionalHints) {
-            Arena.ZoneCircleOutline(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, Colors.Safe, 2.0f);
-            Arena.ZoneCircleOutline(safeSpot, 1.0f, Colors.Danger, 2.0f);
-        } else {
-            Arena.ZoneCircleOutline(safeSpot, 1.0f, Colors.Safe, 2.0f);
+        switch (PulseWave.affectedPlayers[pcSlot]) {
+            case true when dmuConfig.P1GravenImage1KnockbackAdditionalHints:
+                Arena.ZoneCircleOutline(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, Colors.Safe, 2.0f);
+                Arena.ZoneCircleOutline(safeSpot, 1.0f, Colors.Danger, 2.0f);
+                break;
+            case true when !dmuConfig.P1GravenImage1KnockbackAdditionalHints:
+                Arena.ZoneCircleOutline(safeSpot, 1.0f, Colors.Danger, 2.0f);
+                break;
+            default:
+                Arena.ZoneCircleOutline(safeSpot, 1.0f, Colors.Safe, 2.0f);
+                break;
         }
     }
 
@@ -175,9 +181,9 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
         }
 
         if (PulseWave.affectedPlayers[slot]) {
-            hints.GoalZones.Add(AIHints.GoalSingleTarget(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, 50.0f));
+            hints.GoalZones.Add(p => p.InCircle(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f) ? 50.0f : 0.0f);
         } else {
-            hints.GoalZones.Add(AIHints.GoalSingleTarget(safeSpot, 1.0f, 50.0f));
+            hints.GoalZones.Add(p => p.InCircle(safeSpot, 1.0f) ? 50.0f : 0.0f);
         }
     }
 
