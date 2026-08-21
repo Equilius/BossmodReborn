@@ -69,7 +69,6 @@ sealed class WaveCannon : Components.BaitAwayEveryone {
     }
 }
 
-// TODO fix AIHint for when towers overlap - maybe just be corrected in default component
 sealed class WaveCannonTowers(BossModule module) : Components.CastTowers(module, (uint)AID.TowerExplosion, 4.0f) {
     private readonly DateTime[] debuffs = new DateTime[PartyState.MaxPartySize];
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();

@@ -1,19 +1,24 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-// TODO come up with a better way of storing data positions
-// TODO function should be able to just pull data positions on strategy so no if loops inside module code - design pattern?
+public static class PositionWeights {
+    public const float PRE_POSITION = 1.5f; // 1.5f to make the player move to the spot, but allow for positionals still
+    public const float MECHANIC = 100.0f; // TODO check if this is ever used since we can just use forbidden zone now
+}
 
-// TODO consider adding a way for pre-positions + actual positions to have a timer with them if needed
-//  default -> use the component timer
-//  timer while pulling the coordinate use that instead, could be helpful with pre-positions
+public static class PositionDrawSize {
+    public const float PRECISE = 0.75f;
+    public const float NORMAL = 1.0f;
+}
 
-// TODO add pre-position to the config - players may not like the pre-positions could be annoying
-// TODO double check over pre-position positions
+public static class PositionAIRadius {
+    public const float PRECISE = 1.0f;
+    public const float SEMI_PRECISE = 2.0f;
+    public const float GENERAL = 5.0f;
+}
 
-// TODO check over the positions for melee uptime to ensure they keep within range
 
-// TODO add AI settings for pre-positions spots
-// TODO add AI settings for P1GravenImage1 of where support roles go -> this will change the safe spots so most likely not need
+
+
 
 public class P1GravenImage1Data {
     public static IReadOnlyDictionary<PartyRolesConfig.Assignment, (WPos north, WPos south)> SpreadSafeSpots => spreadSafeSpots;

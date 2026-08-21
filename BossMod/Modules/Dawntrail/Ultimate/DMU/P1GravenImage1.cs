@@ -1,11 +1,5 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-// TODO
-//  1. Melee uptime for the knockback - Have a small time to adjust to the correct spot afterwards
-//  2. Improve spreads / stack adjustments - After every has resolved ~0.9 seconds until spreads / stack resolve, have time to adjust if needed
-//      Currently spreads will cover up their safe spot, but could be made bigger since nothing else is going off, just need to keep them around that point
-//      Will also make stacks work correctly if someone is not within range, but it means in prog parties it will look strange
-
 sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, (uint)AID.PulseWave) {
     public bool active = false;
     private DateTime activation;

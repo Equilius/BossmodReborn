@@ -1,47 +1,5 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-sealed class LightOfJudgment(BossModule module) : Components.RaidwideCast(module, (uint)AID.LightOfJudgment);
-
-sealed class HyperDrive(BossModule module) : Components.GenericBaitAway(module, (uint)AID.Hyperdrive, centerAtTarget: true, tankbuster: true, damageType: AIHints.PredictedDamageType.Tankbuster)
-{
-    private DateTime? activation;
-
-    public override void OnCastStarted(Actor caster, ActorCastInfo spell)
-    {
-        if (spell.Action.ID == (uint)AID.LightOfJudgment)
-        {
-            activation = Module.CastFinishAt(spell, 3.0f);
-        }
-    }
-
-    public override void OnEventCast(Actor caster, ActorCastEvent spell)
-    {
-        if (spell.Action.ID == WatchedAction)
-        {
-            NumCasts++;
-
-            if (NumCasts >= 3)
-            {
-                activation = null;
-            }
-        }
-    }
-
-    public override void Update()
-    {
-        CurrentBaits.Clear();
-
-        if (activation != null)
-        {
-            var target = WorldState.Actors.Find(Module.PrimaryActor.TargetID);
-            if (target != null)
-            {
-                CurrentBaits.Add(new(Module.PrimaryActor, target, new AOEShapeCircle(5), activation.Value));
-            }
-        }
-    }
-}
-
 sealed class Gravitas(BossModule module) : Components.UniformStackSpread(module, 5, 5, 4, 4)
 {
     private readonly List<Spread> spreadsIncoming = [];

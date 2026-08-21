@@ -1,17 +1,5 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-// Knockback
-//  if buff: ensure behind everyone in terms of x coord
-//  if non-buff: ensure in front of stack player in terms of x coord
-//  this only works for first one, other ones will need a custom one as well
-
-// TODO consider adding a config option where the stack player will adjust if needed, e.g. a player is slightly off - unsure tho could cause problems
-//  generally every strat does it the same way
-// TODO consider adding an option for safety check if player is behind?
-//  Will need to ensure it will not move too far back to make the other players in the stack miss it by moving backwards
-//  ACTUALLY -> it would be easier for the players without the debuff to just self-check themselves instead as then it will just resolve on them instead
-//      of potentially affecting the whole group of that side
-
 sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStackSpread(module, 6.0f, 0.0f, 4, 4) {
     public bool active = false;
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();

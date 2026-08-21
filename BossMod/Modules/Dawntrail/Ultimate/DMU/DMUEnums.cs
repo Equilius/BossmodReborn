@@ -78,10 +78,13 @@ public enum AID : uint {
     ThrummingThunderIII1 = 47777, // Helper->self, 5.0s cast, range 40 width 10 rect
     ThrummingThunderIIIFake = 47776, // Helper->self, 5.0s cast, range 40 width 10 rect
 
-    // TODO
-
     LightOfJudgment = 50722, // Kefka->self, 5.0s cast, range 100 circle
     Hyperdrive = 49739, // Kefka->player, no cast, range 5 circle
+
+    // TODO
+
+
+
 
     Gravitas = 47788, // 4C31->player, no cast, range 5 circle - Purple puddle - Stack
     Vitrophyre = 47792, // _Gen_GravenImage->players, no cast, range 5 circle - Rock - Spread
