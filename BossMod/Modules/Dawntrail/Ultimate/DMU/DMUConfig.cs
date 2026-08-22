@@ -73,8 +73,16 @@ public sealed class DMUConfig : ConfigNode {
     [PropertyDisplay("P1 RevoltingRuinIII always around true north?", tooltip: "Only used by AI")]
     public bool P1RevoltingRuinIIIAlwaysAroundTrueNorth = true;
 
+    [PropertyDisplay("P1 RevoltingRuinIII 1st bait", tooltip: "Only used by AI")]
+    [PropertyCombo("MT", "OT")]
+    public bool P1RevoltingRuinIIIBait1OT = false;
+
     [PropertyDisplay("P1 HyperDrive always around true north?", tooltip: "Only used by AI")]
     public bool P1HyperDriveAlwaysAroundTrueNorth = true;
+
+    [PropertyDisplay("P1 HyperDrive 1st bait", tooltip: "Only used by AI")]
+    [PropertyCombo("MT", "OT")]
+    public bool P1HyperDriveBait1OT = false;
 
     // Debug Settings
     [PropertyDisplay("P1 Graven Image 1 knockback additional hints", tooltip: "Only used for debugging - H1 & R1 roles will still have to move a fair amount " +

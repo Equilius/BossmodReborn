@@ -638,13 +638,14 @@ sealed class DMUStates : StateMachineBuilder
         Phase1TeleTrouncing(id + 0x3000, 6.8f);
     }
 
-    void Phase1RevoltingRuinIII(uint id, float delay) {
+    void Phase1RevoltingRuinIII(uint id, float delay)
+    {
         ComponentCondition<Hints>(id + 0x01, 0.5f, static o => !o.active)
-            .DeactivateOnExit<Hints>();
-
-        CastStart(id, (uint)AID.RevoltingRuinIIIFirstHit, delay)
-            .ActivateOnEnter<RevoltingRuinIIIFirst>()
+            .DeactivateOnExit<Hints>()
+            .ActivateOnEnter<RevoltingRuinIIIFirst>() // Activated early for pre-position movement - may change to a movement component instead for TB
             .ActivateOnEnter<RevoltingRuinIIISecond>();
+
+        CastStart(id, (uint)AID.RevoltingRuinIIIFirstHit, delay);
 
         ComponentCondition<RevoltingRuinIIIFirst>(id + 0x10, 5.1f, static o => o.NumCasts > 0, "1st Tankbuster Resolve")
             .DeactivateOnExit<RevoltingRuinIIIFirst>();
@@ -691,15 +692,15 @@ sealed class DMUStates : StateMachineBuilder
 
         ComponentCondition<BlizzardIIIBlowout>(id + 0x90, 3.9f, static o => o.NumCasts > 0, "Blizzard + Lightning safe spots")
             .DeactivateOnExit<LightningSafeSpots>()
-            .DeactivateOnExit<BlizzardIIIBlowout>();
+            .DeactivateOnExit<BlizzardIIIBlowout>()
+            .ActivateOnExit<HyperDrive>(); // Activated early for pre-position movement
     }
 
     void Phase1Gravitas(uint id, float delay)
     {
         Cast(id + 0x90, (uint)AID.LightOfJudgment, delay, 5.0f, "Raidwide")
             .ActivateOnEnter<LightOfJudgment>()
-            .DeactivateOnExit<LightOfJudgment>()
-            .ActivateOnEnter<HyperDrive>();
+            .DeactivateOnExit<LightOfJudgment>();
         ComponentCondition<HyperDrive>(id + 0x100, 3.2f, static o => o.NumCasts > 0, "1st Tankbuster");
         ComponentCondition<HyperDrive>(id + 0x110, 2.1f, static o => o.NumCasts > 1, "2nd Tankbuster");
         ComponentCondition<HyperDrive>(id + 0x120, 2.1f, static o => o.NumCasts > 2, "3rd Tankbuster")

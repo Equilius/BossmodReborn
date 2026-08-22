@@ -3,23 +3,53 @@
 static class NorthAIHints {
     private const float maxMelee = 2.5f;
 
-    public static void AddTruthNorthHint(BossModule module, AIHints hints, float radius = 5.0f) {
+    public static void AddForbiddenZone(BossModule module, AIHints hints, float radius, DateTime activation) {
         var hitBox = module.PrimaryActor.HitboxRadius;
         var outerHitBox = hitBox + maxMelee;
+
+        hints.AddForbiddenZone(new SDInvertedDonutSector(module.PrimaryActor.Position, hitBox, outerHitBox, Angle.AnglesCardinals[2],
+            new Angle(MathF.Atan2(radius, outerHitBox))), activation);
+    }
+
+    public static void AddGoalZone(BossModule module, AIHints hints, float radius) {
+        var hitBox = module.PrimaryActor.HitboxRadius;
+        var outerHitBox = hitBox + maxMelee;
+
         hints.GoalZones.Add(p => p.InDonutCone(module.PrimaryActor.Position, hitBox, outerHitBox, Angle.AnglesCardinals[2],
-            new Angle(MathF.Atan2(radius, outerHitBox))) ? 100.0f : 0.0f);
+            new Angle(MathF.Atan2(radius, outerHitBox))) ? PositionWeights.PRE_POSITION : 0.0f);
     }
 }
 
 sealed class RevoltingRuinIIIFirst(BossModule module) : Components.BaitAwayIcon(module, new AOEShapeCone(100.0f, 60.0f.Degrees()), (uint)IconID.TankBuster,
     (uint)AID.RevoltingRuinIIIFirstHit, centerAtTarget: true, tankbuster: true, damageType: AIHints.PredictedDamageType.Tankbuster) {
     private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
+    private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
         base.AddAIHints(slot, actor, assignment, hints);
 
-        if (dmuConfig.P1RevoltingRuinIIIAlwaysAroundTrueNorth && IsBaitTarget(actor)) {
-            NorthAIHints.AddTruthNorthHint(Module, hints);
+        if (!dmuConfig.P1RevoltingRuinIIIAlwaysAroundTrueNorth) {
+            return;
+        }
+
+        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we should not make other roles move
+        if (actor.Role != Role.Tank) {
+            return;
+        }
+
+        // Backup since other tank might be dead in some cases, so it will go on the other tank which is wrong in terms of the AI settings
+        if (IsBaitTarget(actor) && CurrentBaits.Count > 0) {
+            NorthAIHints.AddForbiddenZone(Module, hints, PositionAIRadius.SEMI_PRECISE, CurrentBaits[0].Activation);
+            return;
+        }
+
+        var slots = partyConfig.SlotsPerAssignment(Raid);
+        if (slots.Length == 0) {
+            return;
+        }
+
+        if (assignment == (dmuConfig.P1RevoltingRuinIIIBait1OT ? PartyRolesConfig.Assignment.OT : PartyRolesConfig.Assignment.MT)) {
+            NorthAIHints.AddGoalZone(Module, hints, PositionAIRadius.SEMI_PRECISE);
         }
     }
 }
@@ -76,12 +106,23 @@ sealed class RevoltingRuinIIISecond : Components.GenericBaitAway {
     }
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
-        if (EnableHints) {
-            base.AddAIHints(slot, actor, assignment, hints);
+        if (!EnableHints) {
+            return;
+        }
 
-            if (dmuConfig.P1RevoltingRuinIIIAlwaysAroundTrueNorth && IsBaitTarget(actor)) {
-                NorthAIHints.AddTruthNorthHint(Module, hints);
-            }
+        base.AddAIHints(slot, actor, assignment, hints);
+
+        if (!dmuConfig.P1RevoltingRuinIIIAlwaysAroundTrueNorth) {
+            return;
+        }
+
+        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we should not make other roles move
+        if (actor.Role != Role.Tank) {
+            return;
+        }
+
+        if (IsBaitTarget(actor) && CurrentBaits.Count > 0) {
+            NorthAIHints.AddForbiddenZone(Module, hints, PositionAIRadius.SEMI_PRECISE, CurrentBaits[0].Activation);
         }
     }
 }
@@ -91,6 +132,7 @@ sealed class HyperDrive(BossModule module) : Components.GenericBaitAway(module, 
     private DateTime activation;
     private readonly AOEShapeCircle shape = new(5.0f);
     private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
+    private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
 
     public override void OnCastStarted(Actor caster, ActorCastInfo spell) {
         if (spell.Action.ID == (uint)AID.LightOfJudgment) {
@@ -124,8 +166,28 @@ sealed class HyperDrive(BossModule module) : Components.GenericBaitAway(module, 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
         base.AddAIHints(slot, actor, assignment, hints);
 
-        if (dmuConfig.P1HyperDriveAlwaysAroundTrueNorth && IsBaitTarget(actor)) {
-            NorthAIHints.AddTruthNorthHint(Module, hints, 1.5f);
+        if (!dmuConfig.P1HyperDriveAlwaysAroundTrueNorth) {
+            return;
+        }
+
+        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we should not make other roles move
+        if (actor.Role != Role.Tank) {
+            return;
+        }
+
+        // Backup since other tank might be dead in some cases, so it will go on the other tank which is wrong in terms of the AI settings
+        if (IsBaitTarget(actor) && CurrentBaits.Count > 0) {
+            NorthAIHints.AddForbiddenZone(Module, hints,  PositionAIRadius.SEMI_PRECISE, CurrentBaits[0].Activation);
+            return;
+        }
+
+        var slots = partyConfig.SlotsPerAssignment(Raid);
+        if (slots.Length == 0) {
+            return;
+        }
+
+        if (assignment == (dmuConfig.P1HyperDriveBait1OT ? PartyRolesConfig.Assignment.OT : PartyRolesConfig.Assignment.MT)) {
+            NorthAIHints.AddGoalZone(Module, hints, PositionAIRadius.SEMI_PRECISE);
         }
     }
 }

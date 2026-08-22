@@ -1,24 +1,23 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
+// Used for weights for the pathfinder
 public static class PositionWeights {
     public const float PRE_POSITION = 1.5f; // 1.5f to make the player move to the spot, but allow for positionals still
-    public const float MECHANIC = 100.0f; // TODO check if this is ever used since we can just use forbidden zone now
 }
 
+// Used for green circle on the foreground / background
 public static class PositionDrawSize {
     public const float PRECISE = 0.75f;
     public const float NORMAL = 1.0f;
 }
 
+// Used for the radius the player can stand around that point given
 public static class PositionAIRadius {
     public const float PRECISE = 1.0f;
-    public const float SEMI_PRECISE = 2.0f;
+    public const float SEMI_PRECISE = 1.5f;
+    public const float NORMAL = 2.0f;
     public const float GENERAL = 5.0f;
 }
-
-
-
-
 
 public class P1GravenImage1Data {
     public static IReadOnlyDictionary<PartyRolesConfig.Assignment, (WPos north, WPos south)> SpreadSafeSpots => spreadSafeSpots;
