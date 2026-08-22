@@ -20,8 +20,19 @@ public static class PositionAIRadius {
 }
 
 public class P1GravenImage1Data {
+    public static IReadOnlyDictionary<Role, (WPos tethered, WPos normal)> PulseWavePrePositions => pulseWavePrePositions;
     public static IReadOnlyDictionary<PartyRolesConfig.Assignment, (WPos north, WPos south)> SpreadSafeSpots => spreadSafeSpots;
     public static IReadOnlyDictionary<Role, (WPos north, WPos south)> StackSafeSpots => stackSafeSpots;
+
+    private static readonly Dictionary<Role, (WPos tethered, WPos normal)> pulseWavePrePositions = new() {
+        // Melee stand slightly inside the hitbox
+        [Role.Melee] = (new WPos(104.000f, 93.000f), new WPos(104.000f, 100.000f)),
+        [Role.Tank] = (new WPos(96.000f, 93.000f), new WPos(96.000f, 100.000f)),
+
+        // Range stand on the hitbox
+        [Role.Ranged] = (new WPos(106.000f, 93.000f), new WPos(106.000f, 100.000f)),
+        [Role.Healer] = (new WPos(94.000f, 93.000f), new WPos(94.000f, 100.000f)),
+    };
 
     private static readonly Dictionary<PartyRolesConfig.Assignment, (WPos north, WPos south)> spreadSafeSpots = new() {
         [PartyRolesConfig.Assignment.M1] = (new WPos(101.000f, 93.500f), new WPos(101.000f, 106.500f)),

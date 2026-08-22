@@ -6,6 +6,7 @@ sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, 
     public const float KnockbackDistance = 13.0f;
     public BitMask affectedPlayers;
     public Actor? tetherSource = null;
+    private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
 
     public override void OnTethered(Actor source, in ActorTetherInfo tether) {
         if (tether.ID == (uint)TetherID.GravenImageTether && Raid.FindSlot(tether.Target) is var slot && slot >= 0) {
@@ -36,30 +37,23 @@ sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, 
     }
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
-        if (!active) {
+        if (!dmuConfig.P1PulseWavePrePosition || !active) {
             return;
         }
 
-        // Case: Non-tethered players will stand middle of their side
-        if (!affectedPlayers[slot]) {
-            if (actor.Role is Role.Tank or Role.Healer) {
-                hints.GoalZones.Add(p => p.InCircle(new WPos(96.000f, 100.000f), 2.0f) ? 1.5f : 0.0f);
-            }
-
-            if (actor.Role is Role.Melee or Role.Ranged) {
-                hints.GoalZones.Add(p => p.InCircle(new WPos(104.000f, 100.000f), 2.0f) ? 1.5f : 0.0f);
-            }
+        var spot = P1GravenImage1Data.PulseWavePrePositions.GetValueOrDefault(actor.Role);
+        if (spot == default) {
+            return;
         }
 
-        // Case: Tethered players will stand middle of their side, but slightly north
-        if (affectedPlayers[slot]) {
-            if (actor.Role is Role.Tank or Role.Healer) {
-                hints.GoalZones.Add(p => p.InCircle(new WPos(96.000f, 94.000f), 2.0f) ? 1.5f : 0.0f);
-            }
+        // Case: Non-tethered players
+        if (!affectedPlayers[slot]) {
+            hints.GoalZones.Add(p => p.InCircle(spot.normal, PositionAIRadius.PRECISE) ? PositionWeights.PRE_POSITION : 0.0f);
+        }
 
-            if (actor.Role is Role.Melee or Role.Ranged) {
-                hints.GoalZones.Add(p => p.InCircle(new WPos(104.000f, 94.000f), 2.0f) ? 1.5f : 0.0f);
-            }
+        // Case: Tethered players
+        if (affectedPlayers[slot]) {
+            hints.GoalZones.Add(p => p.InCircle(spot.tethered, PositionAIRadius.PRECISE) ? PositionWeights.PRE_POSITION : 0.0f);
         }
     }
 }

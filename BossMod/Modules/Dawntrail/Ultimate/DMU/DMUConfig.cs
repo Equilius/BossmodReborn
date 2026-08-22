@@ -70,6 +70,9 @@ public sealed class DMUConfig : ConfigNode {
     public P2ForsakenStrategy P2Forsaken = P2ForsakenStrategy.Meow_Markerless;
 
     // AI Settings
+    [PropertyDisplay("P1 Pre-position for PulseWave?", tooltip: "Only used by AI")]
+    public bool P1PulseWavePrePosition = true;
+
     [PropertyDisplay("P1 RevoltingRuinIII always around true north?", tooltip: "Only used by AI")]
     public bool P1RevoltingRuinIIIAlwaysAroundTrueNorth = true;
 
