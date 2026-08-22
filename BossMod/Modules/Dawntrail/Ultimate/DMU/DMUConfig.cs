@@ -73,6 +73,9 @@ public sealed class DMUConfig : ConfigNode {
     [PropertyDisplay("P1 RevoltingRuinIII always around true north?", tooltip: "Only used by AI")]
     public bool P1RevoltingRuinIIIAlwaysAroundTrueNorth = true;
 
+    [PropertyDisplay("P1 HyperDrive always around true north?", tooltip: "Only used by AI")]
+    public bool P1HyperDriveAlwaysAroundTrueNorth = true;
+
     // Debug Settings
     [PropertyDisplay("P1 Graven Image 1 knockback additional hints", tooltip: "Only used for debugging - H1 & R1 roles will still have to move a fair amount " +
                                                                               " if north is safe, other roles will only have to do slight adjustments")]
