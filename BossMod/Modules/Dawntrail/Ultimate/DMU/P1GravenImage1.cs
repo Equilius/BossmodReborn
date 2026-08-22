@@ -2,7 +2,7 @@
 
 sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, (uint)AID.PulseWave) {
     public bool active = false;
-    private DateTime activation;
+    public DateTime activation;
     public const float KnockbackDistance = 13.0f;
     public BitMask affectedPlayers;
     public Actor? tetherSource = null;
@@ -68,7 +68,7 @@ sealed class BlizzardIIIBlowoutGraven1(BossModule module) : BlizzardIIIBlowout(m
     public override void OnCastStarted(Actor caster, ActorCastInfo spell) {
         base.OnCastStarted(caster, spell);
 
-        if (spell.Action.ID == (uint)AID.BlizzardIIIBlowout || spell.Action.ID == (uint)AID.BlizzardIIIBlowout1) {
+        if (spell.Action.ID is (uint)AID.BlizzardIIIBlowout or (uint)AID.BlizzardIIIBlowout1) {
             supportNorth = !Casters.Exists(c => c.Check(new WPos(89.000f, 89.000f)));
             dpsNorth = !Casters.Exists(c => c.Check(new WPos(111.000f, 89.000f)));
             activation = Module.CastFinishAt(spell);
@@ -148,18 +148,18 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
             return;
         }
 
-        switch (PulseWave.affectedPlayers[pcSlot]) {
-            case true when dmuConfig.P1GravenImage1KnockbackAdditionalHints:
-                Arena.ZoneCircleOutline(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f, Colors.Safe, 2.0f);
-                Arena.ZoneCircleOutline(safeSpot, 1.0f, Colors.Danger, 2.0f);
-                break;
-            case true when !dmuConfig.P1GravenImage1KnockbackAdditionalHints:
-                Arena.ZoneCircleOutline(safeSpot, 1.0f, Colors.Danger, 2.0f);
-                break;
-            default:
-                Arena.ZoneCircleOutline(safeSpot, 1.0f, Colors.Safe, 2.0f);
-                break;
+        if (PulseWave.affectedPlayers[pcSlot] && dmuConfig.P1GravenImage1KnockbackAdditionalHints) {
+            Arena.ZoneCircleOutline(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), PositionDrawSize.NORMAL, Colors.Safe, 2.0f);
+            Arena.ZoneCircleOutline(safeSpot, PositionDrawSize.NORMAL, Colors.Danger, 2.0f);
+            return;
         }
+
+        if (PulseWave.affectedPlayers[pcSlot] && !dmuConfig.P1GravenImage1KnockbackAdditionalHints) {
+            Arena.ZoneCircleOutline(safeSpot, PositionDrawSize.NORMAL, Colors.Danger, 2.0f);
+            return;
+        }
+
+        Arena.ZoneCircleOutline(safeSpot, PositionDrawSize.NORMAL, Colors.Safe, 2.0f);
     }
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
@@ -173,10 +173,12 @@ sealed class FlagrantFire(BossModule module) : Components.UniformStackSpread(mod
         }
 
         if (PulseWave.affectedPlayers[slot]) {
-            hints.GoalZones.Add(p => p.InCircle(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), 1.0f) ? 50.0f : 0.0f);
-        } else {
-            hints.GoalZones.Add(p => p.InCircle(safeSpot, 1.0f) ? 50.0f : 0.0f);
+            hints.AddForbiddenZone(new SDInvertedCircle(GetKnockbackPosition(PulseWave.tetherSource.Position, safeSpot), PositionAIRadius.PRECISE),
+                PulseWave.activation);
+            return;
         }
+
+        hints.AddForbiddenZone(new SDInvertedCircle(safeSpot, PositionAIRadius.PRECISE), PulseWave.activation);
     }
 
     // Pulls the data spot for the player
