@@ -147,7 +147,9 @@ sealed class DMUStates : StateMachineBuilder
 
         ActorCastStart(id + 0x10, _module.KefkaP4, (uint)AID.MysteryMagic, 4.6f, true, "Mystery Magic")
             .ActivateOnEnter<BlizzardIIIBlowout>()
-            .ActivateOnEnter<LightningSafeSpots>();
+            .ActivateOnEnter<LightningSafeSpots>()
+            .ExecOnEnter<BlizzardIIIBlowout>(static o => o.Risky = true)
+            .ExecOnEnter<LightningSafeSpots>(static o => o.Risky = true);
 
         ComponentCondition<BlizzardIIIBlowout>(id + 0x20, 5.0f, static o => o.NumCasts > 0, "Blizzard + Lightning safe spots")
             .DeactivateOnExit<LightningSafeSpots>()
@@ -164,7 +166,9 @@ sealed class DMUStates : StateMachineBuilder
 
         ActorCastStart(id + 0x50, _module.KefkaP4, (uint)AID.MysteryMagic, 0.5f, true, "Mystery Magic")
             .ActivateOnEnter<BlizzardIIIBlowout>()
-            .ActivateOnEnter<LightningSafeSpots>();
+            .ActivateOnEnter<LightningSafeSpots>()
+            .ExecOnEnter<BlizzardIIIBlowout>(static o => o.Risky = true)
+            .ExecOnEnter<LightningSafeSpots>(static o => o.Risky = true);
 
         ComponentCondition<BlizzardIIIBlowout>(id + 0x60, 5.0f, static o => o.NumCasts > 0, "Blizzard + Lightning safe spots")
             .DeactivateOnExit<LightningSafeSpots>()
@@ -181,7 +185,9 @@ sealed class DMUStates : StateMachineBuilder
 
         ActorCastStart(id + 0x90, _module.KefkaP4, (uint)AID.MysteryMagic, 0.7f, true, "Mystery Magic")
             .ActivateOnEnter<BlizzardIIIBlowout>()
-            .ActivateOnEnter<LightningSafeSpots>();
+            .ActivateOnEnter<LightningSafeSpots>()
+            .ExecOnEnter<BlizzardIIIBlowout>(static o => o.Risky = true)
+            .ExecOnEnter<LightningSafeSpots>(static o => o.Risky = true);
 
         ComponentCondition<BlizzardIIIBlowout>(id + 0x100, 5.0f, static o => o.NumCasts > 0, "Blizzard + Lightning safe spots")
             .DeactivateOnExit<LightningSafeSpots>()
@@ -205,6 +211,7 @@ sealed class DMUStates : StateMachineBuilder
             .DeactivateOnExit<ForkedWater>()
             .DeactivateOnExit<AccelerationBomb>()
             .ActivateOnEnter<LightningSafeSpots>()
+            .ExecOnEnter<LightningSafeSpots>(static o => o.Risky = true)
             .ActivateOnExit<CursedShriek>()
             .ActivateOnExit<KefkaOrder>();
 
@@ -237,7 +244,8 @@ sealed class DMUStates : StateMachineBuilder
                 "Spreads + Stacks + Acceleration Bombs Resolve")
             .DeactivateOnExit<ForkedWater>()
             .DeactivateOnExit<AccelerationBomb>()
-            .ActivateOnEnter<BlizzardIIIBlowout>();
+            .ActivateOnEnter<BlizzardIIIBlowout>()
+            .ExecOnEnter<BlizzardIIIBlowout>(static o => o.Risky = true);
 
         ComponentCondition<BlizzardIIIBlowout>(id + 0x190, 1.5f, static o => o.NumCasts > 0, "Blizzard Safe spots")
             .DeactivateOnExit<BlizzardIIIBlowout>()
@@ -252,7 +260,9 @@ sealed class DMUStates : StateMachineBuilder
             .DeactivateOnExit<Tsunami>()
             .DeactivateOnExit<TsunamiBaits>()
             .ActivateOnEnter<BlizzardIIIBlowout>()
-            .ActivateOnEnter<LightningSafeSpots>();
+            .ActivateOnEnter<LightningSafeSpots>()
+            .ExecOnEnter<BlizzardIIIBlowout>(static o => o.Risky = true)
+            .ExecOnEnter<LightningSafeSpots>(static o => o.Risky = true);
 
         ComponentCondition<LightningSafeSpots>(id + 0x220, 0.5f, static o => o.NumCasts > 0, "Blizzard + Lightning Safe Spots")
             .DeactivateOnExit<LightningSafeSpots>()
@@ -662,7 +672,7 @@ sealed class DMUStates : StateMachineBuilder
         CastStart(id + 0x20, (uint)AID.MysteryMagic, 3.2f);
         ComponentCondition<PulseWave>(id + 0x30, 2.6f, static o => o.NumCasts == 4, "Knockbacks")
             .DeactivateOnExit<PulseWave>()
-            .ExecOnExit<BlizzardIIIBlowoutGraven1>(o => o.enabledHints = true);
+            .ExecOnExit<BlizzardIIIBlowoutGraven1>(o => o.Risky = true);
         ComponentCondition<BlizzardIIIBlowoutGraven1>(id + 0x40, 2.3f, static o => o.NumCasts > 0, "Blizzard safe spots")
             .DeactivateOnExit<BlizzardIIIBlowoutGraven1>();
 
@@ -687,8 +697,8 @@ sealed class DMUStates : StateMachineBuilder
         ComponentCondition<DoubleTroubleTrapStacks>(id + 0x80, 1.0f, static o => o.NumCasts == 2, "Stacks + Knockbacks")
             .DeactivateOnExit<DoubleTroubleTrapStacks>()
             .DeactivateOnExit<DoubleTroubleTrapKnockback>()
-            .ExecOnExit<BlizzardIIIBlowout>(static o => o.enabledHints = true)
-            .ExecOnExit<LightningSafeSpots>(static o => o.enabledHints = true);
+            .ExecOnExit<BlizzardIIIBlowout>(static o => o.Risky = true)
+            .ExecOnExit<LightningSafeSpots>(static o => o.Risky = true);
 
         ComponentCondition<BlizzardIIIBlowout>(id + 0x90, 3.9f, static o => o.NumCasts > 0, "Blizzard + Lightning safe spots")
             .DeactivateOnExit<LightningSafeSpots>()

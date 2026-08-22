@@ -60,11 +60,10 @@ sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, 
 
 // Custom version specially for GravenImage1 to make the player avoid going to the incorrect side as the pathfinder will override everything when the cast
 // has <1.0f left, so this is needed to ensure the player move to their side only (left/right depending on the role)
-sealed class BlizzardIIIBlowoutGraven1 : BlizzardIIIBlowout {
+sealed class BlizzardIIIBlowoutGraven1(BossModule module) : BlizzardIIIBlowout(module) {
     public bool? supportNorth = null;
     public bool? dpsNorth = null;
-
-    public BlizzardIIIBlowoutGraven1(BossModule module) : base(module) {}
+    private DateTime activation;
 
     public override void OnCastStarted(Actor caster, ActorCastInfo spell) {
         base.OnCastStarted(caster, spell);
@@ -72,22 +71,27 @@ sealed class BlizzardIIIBlowoutGraven1 : BlizzardIIIBlowout {
         if (spell.Action.ID == (uint)AID.BlizzardIIIBlowout || spell.Action.ID == (uint)AID.BlizzardIIIBlowout1) {
             supportNorth = !Casters.Exists(c => c.Check(new WPos(89.000f, 89.000f)));
             dpsNorth = !Casters.Exists(c => c.Check(new WPos(111.000f, 89.000f)));
+            activation = Module.CastFinishAt(spell);
         }
     }
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
+        if (!Risky || activation == default) {
+            return;
+        }
+
         base.AddAIHints(slot, actor, assignment, hints);
 
-        if (enabledHints) {
-            // Case: support players will avoid right side completely
-            if (actor.Role is Role.Tank or Role.Healer) {
-                hints.AddForbiddenZone(new SDCone(new WPos(100.0f, 100.0f), 100.0f, Angle.AnglesCardinals[2].ToDirection().OrthoR().ToAngle(), 90.0f.Degrees()));
-            }
+        // Case: support players will avoid right side completely
+        if (actor.Role is Role.Tank or Role.Healer) {
+            hints.AddForbiddenZone(new SDCone(new WPos(100.0f, 100.0f), 100.0f, Angle.AnglesCardinals[2].ToDirection().OrthoR().ToAngle(), 90.0f.Degrees()),
+                activation);
+        }
 
-            // Case: damage dealers will avoid left side completely
-            if (actor.Role is Role.Melee or Role.Ranged) {
-                hints.AddForbiddenZone(new SDCone(new WPos(100.0f, 100.0f), 100.0f, Angle.AnglesCardinals[2].ToDirection().OrthoL().ToAngle(), 90.0f.Degrees()));
-            }
+        // Case: damage dealers will avoid left side completely
+        if (actor.Role is Role.Melee or Role.Ranged) {
+            hints.AddForbiddenZone(new SDCone(new WPos(100.0f, 100.0f), 100.0f, Angle.AnglesCardinals[2].ToDirection().OrthoL().ToAngle(), 90.0f.Degrees()),
+                activation);
         }
     }
 }
