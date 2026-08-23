@@ -3,6 +3,7 @@
 // Used for weights for the pathfinder
 public static class PositionWeights {
     public const float PRE_POSITION = 5.0f; // 1.5f to make the player move to the spot, but allow for positionals still
+    public const float MECHANIC = 100.0f;
 }
 
 // Used for green circle on the foreground / background
@@ -54,18 +55,16 @@ public class P1GravenImage1Data {
 }
 
 public class P1WaveCannonData {
-    public static IReadOnlyDictionary<PartyRolesConfig.Assignment, WPos> Safespots => safeSpots;
-
-    private static readonly Dictionary<PartyRolesConfig.Assignment, WPos> safeSpots = new() {
-        [PartyRolesConfig.Assignment.H1] = new WPos(87.0f, 98.0f),
-        [PartyRolesConfig.Assignment.H2] = new WPos(81.0f, 97.0f),
-        [PartyRolesConfig.Assignment.OT] = new WPos(92.0f, 99.0f),
-        [PartyRolesConfig.Assignment.MT] = new WPos(97.0f, 100.0f),
-        [PartyRolesConfig.Assignment.M1] = new WPos(103.0f, 100.0f),
-        [PartyRolesConfig.Assignment.M2] = new WPos(108.0f, 99.0f),
-        [PartyRolesConfig.Assignment.R1] = new WPos(113.0f, 98.0f),
-        [PartyRolesConfig.Assignment.R2] = new WPos(119.0f, 97.0f),
-    };
+    public static readonly WPos[] safeSpots = [
+        new WPos(81.0f, 97.0f),
+        new WPos(87.0f, 98.0f),
+        new WPos(92.0f, 99.0f),
+        new WPos(97.0f, 100.0f),
+        new WPos(103.0f, 100.0f),
+        new WPos(108.0f, 99.0f),
+        new WPos(113.0f, 98.0f),
+        new WPos(119.0f, 97.0f),
+    ];
 }
 
 public class P1DoubleTroubleKnockBackData {

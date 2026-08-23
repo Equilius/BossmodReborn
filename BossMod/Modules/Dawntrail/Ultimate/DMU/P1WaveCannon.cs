@@ -24,7 +24,7 @@ sealed class WaveCannon : Components.BaitAwayEveryone {
 
         base.DrawArenaForeground(pcSlot, pc);
 
-        if (!dmuConfig.P1WaveCannonHints) {
+        if (!dmuConfig.P1WaveCannonHints || !dmuConfig.P1WaveCannonAssignment.Validate()) {
             return;
         }
 
@@ -32,14 +32,10 @@ sealed class WaveCannon : Components.BaitAwayEveryone {
         if (slots.Length == 0) {
             return;
         }
+
         var assignment = partyConfig[Raid.Members[pcSlot].ContentId];
-        var myAssignment = (PartyRolesConfig.Assignment)dmuConfig.P1WaveCannonAssignment[assignment];
-
-        var safeSpot = P1WaveCannonData.Safespots.GetValueOrDefault(myAssignment);
-        if (safeSpot == default) {
-            return;
-        }
-
+        var order = dmuConfig.P1WaveCannonAssignment[assignment];
+        var safeSpot = P1WaveCannonData.safeSpots[order];
         Arena.ZoneCircleOutline(safeSpot, PositionDrawSize.PRECISE, Colors.Safe, 2.0f);
     }
 
@@ -48,9 +44,7 @@ sealed class WaveCannon : Components.BaitAwayEveryone {
             return;
         }
 
-        var remaining = (activation - WorldState.CurrentTime).TotalSeconds;
-        if (remaining <= 0.7f) {
-            base.AddAIHints(slot, actor, assignment, hints);
+        if (!dmuConfig.P1WaveCannonAssignment.Validate()) {
             return;
         }
 
@@ -59,8 +53,14 @@ sealed class WaveCannon : Components.BaitAwayEveryone {
             return;
         }
 
-        var safeSpot = P1WaveCannonData.Safespots.GetValueOrDefault(assignment);
-        if (safeSpot == default) {
+        var order = dmuConfig.P1WaveCannonAssignment[assignment];
+        var safeSpot = P1WaveCannonData.safeSpots[order];
+
+
+        var remaining = (activation - WorldState.CurrentTime).TotalSeconds;
+        if (remaining <= 0.7f) {
+            base.AddAIHints(slot, actor, assignment, hints);
+            hints.GoalZones.Add(AIHints.GoalProximity(safeSpot, PositionAIRadius.PRECISE, PositionWeights.MECHANIC));
             return;
         }
 
