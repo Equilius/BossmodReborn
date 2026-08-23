@@ -32,8 +32,11 @@ sealed class RevoltingRuinIIIFirst(BossModule module) : Components.BaitAwayIcon(
             return;
         }
 
-        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we should not make other roles move
-        if (actor.Role != Role.Tank) {
+        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we shouldn't make other roles move like they would
+        // This will also prevent them from being around true north when the TB is resolving otherwise you might scare the tank for being so close
+        if (actor.Role != Role.Tank && CurrentBaits.Count > 0) {
+            hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 10.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()),
+                CurrentBaits[0].Activation);
             return;
         }
 
@@ -116,8 +119,11 @@ sealed class RevoltingRuinIIISecond : Components.GenericBaitAway {
             return;
         }
 
-        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we should not make other roles move
-        if (actor.Role != Role.Tank) {
+        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we shouldn't make other roles move like they would
+        // This will also prevent them from being around true north when the TB is resolving otherwise you might scare the tank for being so close
+        if (actor.Role != Role.Tank && CurrentBaits.Count > 0) {
+            hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 10.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()),
+                CurrentBaits[0].Activation);
             return;
         }
 
@@ -170,8 +176,11 @@ sealed class HyperDrive(BossModule module) : Components.GenericBaitAway(module, 
             return;
         }
 
-        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we should not make other roles move
-        if (actor.Role != Role.Tank) {
+        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we shouldn't make other roles move like they would
+        // This will also prevent them from being around true north when the TB is resolving otherwise you might scare the tank for being so close
+        if (actor.Role != Role.Tank && CurrentBaits.Count > 0) {
+            hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 10.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()),
+                CurrentBaits[0].Activation);
             return;
         }
 
