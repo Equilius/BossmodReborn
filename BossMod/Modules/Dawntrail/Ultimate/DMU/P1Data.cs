@@ -2,7 +2,7 @@
 
 // Used for weights for the pathfinder
 public static class PositionWeights {
-    public const float PRE_POSITION = 1.5f; // 1.5f to make the player move to the spot, but allow for positionals still
+    public const float PRE_POSITION = 5.0f; // 1.5f to make the player move to the spot, but allow for positionals still
 }
 
 // Used for green circle on the foreground / background

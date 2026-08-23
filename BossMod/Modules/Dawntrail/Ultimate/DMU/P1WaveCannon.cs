@@ -183,12 +183,18 @@ sealed class WaveCannonTowers(BossModule module) : Components.CastTowers(module,
 
         soakers.Sort((a, b) => a.order.CompareTo(b.order));
 
-        for (int i = 0; i < Towers.Count && i < soakers.Count; i++) {
+        for (int i = 0; i < Towers.Count; i++) {
             var tower = Towers[i];
-            var soaker = soakers[i];
             BitMask forbiddenPlayers = default;
-            forbiddenPlayers.Set(soaker.slot);
-            tower.ForbiddenSoakers = ~forbiddenPlayers;
+
+            if (i < soakers.Count) {
+                var soaker = soakers[i];
+                forbiddenPlayers.Set(soaker.slot);
+                tower.ForbiddenSoakers = ~forbiddenPlayers;
+            } else {
+                tower.ForbiddenSoakers = ~forbiddenPlayers;
+            }
+
             Towers[i] = tower;
         }
     }
