@@ -67,7 +67,7 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
             return;
         }
 
-        Arena.ZoneCircleOutline(safeSpot, 1.0f, Colors.Safe);
+        Arena.ZoneCircleOutline(safeSpot, PositionDrawSize.NORMAL, Colors.Safe, 2.0f);
     }
 
     public override void AddHints(int slot, Actor actor, TextHints hints) {
@@ -79,7 +79,7 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
     }
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
-        if (!active || Stacks.Count == 0) {
+        if (!active) {
             return;
         }
 
@@ -94,12 +94,11 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
             safeSpot = P1DoubleTroubleKnockBackData.StackSafeSpots.GetValueOrDefault(actor.Role).stackHelper;
         }
 
-
         if (safeSpot == default) {
             return;
         }
 
-        hints.AddForbiddenZone(new SDInvertedCircle(safeSpot, 1.0f), activation);
+        hints.AddForbiddenZone(new SDInvertedCircle(safeSpot, PositionAIRadius.PRECISE), activation);
     }
 
     public override PlayerPriority CalcPriority(int pcSlot, Actor pc, int playerSlot, Actor player, ref uint customColor) {
@@ -118,7 +117,7 @@ sealed class DoubleTroubleTrapKnockback(BossModule module) : Components.GenericK
     public override ReadOnlySpan<Knockback> ActiveKnockbacks(int slot, Actor actor) {
         knockbacks.Clear();
 
-        if (doubleTroubleTrapStacks == null || !doubleTroubleTrapStacks.active || doubleTroubleTrapStacks.Stacks.Count == 0) {
+        if (doubleTroubleTrapStacks == null || !doubleTroubleTrapStacks.active) {
             return [];
         }
 

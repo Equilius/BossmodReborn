@@ -78,7 +78,3 @@ public class P1DoubleTroubleKnockBackData {
         [Role.Tank] = (new WPos(92.500f, 100.000f), new  WPos(95.000f, 100.000f)),
     };
 }
-
-
-
-

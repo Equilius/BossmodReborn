@@ -48,12 +48,12 @@ sealed class PulseWave(BossModule module) : Components.GenericKnockback(module, 
 
         // Case: Non-tethered players
         if (!affectedPlayers[slot]) {
-            hints.GoalZones.Add(p => p.InCircle(spot.normal, PositionAIRadius.PRECISE) ? PositionWeights.PRE_POSITION : 0.0f);
+            hints.GoalZones.Add(AIHints.GoalProximity(spot.normal, PositionAIRadius.PRECISE, PositionWeights.PRE_POSITION));
         }
 
         // Case: Tethered players
         if (affectedPlayers[slot]) {
-            hints.GoalZones.Add(p => p.InCircle(spot.tethered, PositionAIRadius.PRECISE) ? PositionWeights.PRE_POSITION : 0.0f);
+            hints.GoalZones.Add(AIHints.GoalProximity(spot.tethered, PositionAIRadius.PRECISE, PositionWeights.PRE_POSITION));
         }
     }
 }

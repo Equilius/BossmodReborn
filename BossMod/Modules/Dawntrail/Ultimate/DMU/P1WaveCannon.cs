@@ -2,7 +2,7 @@
 
 sealed class WaveCannon : Components.BaitAwayEveryone {
     private readonly DateTime activation;
-    private const float baitActivation = 4.0f;
+    private const float baitActivation = 4.0f; // TODO when cleaning up the timeline ensure this is still correct
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
     private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
 
@@ -34,18 +34,17 @@ sealed class WaveCannon : Components.BaitAwayEveryone {
         }
         var assignment = partyConfig[Raid.Members[pcSlot].ContentId];
         var myAssignment = (PartyRolesConfig.Assignment)dmuConfig.P1WaveCannonAssignment[assignment];
-        var safeSpot = P1WaveCannonData.Safespots.GetValueOrDefault(myAssignment);
 
+        var safeSpot = P1WaveCannonData.Safespots.GetValueOrDefault(myAssignment);
         if (safeSpot == default) {
             return;
         }
 
-        Arena.ZoneCircleOutline(safeSpot, 0.75f, Colors.Safe);
+        Arena.ZoneCircleOutline(safeSpot, PositionDrawSize.PRECISE, Colors.Safe, 2.0f);
     }
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
-        var count = CurrentBaits.Count;
-        if (count == 0) {
+        if (CurrentBaits.Count == 0) {
             return;
         }
 
@@ -65,7 +64,7 @@ sealed class WaveCannon : Components.BaitAwayEveryone {
             return;
         }
 
-        hints.AddForbiddenZone(new SDInvertedCircle(safeSpot, 1.0f), activation);
+        hints.AddForbiddenZone(new SDInvertedCircle(safeSpot, PositionAIRadius.PRECISE), activation);
     }
 }
 
@@ -96,8 +95,57 @@ sealed class WaveCannonTowers(BossModule module) : Components.CastTowers(module,
                 return;
             }
 
-            // Case: Party assignment are set up so we can solve it correctly
+            // Case: party assignment are set up so we can solve it correctly
             setupSpecificForbiddenPlayers();
+        }
+    }
+
+    // Custom AIHints since towers can overlap, we have to stand where the tower is not overlapping + go to the front of the tower as much as possible
+    public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
+        var towers = ActiveTowers(slot, actor);
+        var len = towers.Length;
+        if (len == 0) {
+            return;
+        }
+
+        var forbiddenInverted = new List<ShapeDistance>(len);
+        var forbidden = new List<ShapeDistance>(len);
+
+        for (int i = 0; i < len; i++) {
+            ref readonly var tower = ref towers[i];
+            if (tower.ForbiddenSoakers[slot]) {
+                forbidden.Add(tower.ShapeDistance ?? tower.Shape.Distance(tower.Position, tower.Rotation));
+            }
+
+            if (!tower.ForbiddenSoakers[slot]) {
+                forbiddenInverted.Add(tower.InvertedShapeDistance ?? tower.Shape.InvertedDistance(tower.Position, tower.Rotation));
+                var center = (Arena.Center - tower.Position).Normalized();
+
+                // If the tower is inside the boss' hitbox then we should aim for the outer radius of the tower (back of tower)
+                if (tower.Position.InCircle(Module.PrimaryActor.Position, Radius + Module.PrimaryActor.HitboxRadius)) {
+                    center = -center;
+                }
+
+                // If the tower is outside the boss's hitbox then we should aim for the inner radius of the tower (front of tower)
+                var front = tower.Position + center * Radius;
+                hints.GoalZones.Add(AIHints.GoalProximity(front, Arena.Bounds.Radius, PositionWeights.PRE_POSITION));
+            }
+        }
+
+        if (forbiddenInverted.Count != 0) {
+            hints.AddForbiddenZone(new SDIntersection([.. forbiddenInverted]), towers[0].Activation);
+        }
+
+        for (int i = 0; i < forbidden.Count; i++) {
+            var activation = towers[i].Activation;
+            hints.AddForbiddenZone(forbidden[i], activation);
+
+            // Donut cones east and west to help with players standing near the boss and pre-position for the next mechanic
+            hints.GoalZones.Add(p => p.InDonutCone(Module.PrimaryActor.Position, 5.0f, 8.0f, Angle.AnglesCardinals[0], 60.0f.Degrees()) ?
+                PositionWeights.PRE_POSITION : 0.0f);
+
+            hints.GoalZones.Add(p => p.InDonutCone(Module.PrimaryActor.Position, 5.0f, 8.0f, Angle.AnglesCardinals[3], 60.0f.Degrees()) ?
+                PositionWeights.PRE_POSITION : 0.0f);
         }
     }
 
