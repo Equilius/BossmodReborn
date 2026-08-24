@@ -110,9 +110,25 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
     }
 }
 
+// Knockback with distance 6 is different to other knockbacks, so we have to clear the pending knockbacks after a set amount of time so the player
+// can move out of the active aoes after being knocked back across the map - currently they have around ~2.7 seconds to get out of the aoes
+// Does the following:
+//  1. Any player getting knocked back will have their pending knockbacks cleared after ~1.2 seconds
+//  2. Any player with the stack debuff will be forced to stand still until all pending knockbacks have been cleared
 sealed class DoubleTroubleTrapKnockback(BossModule module) : Components.GenericKnockback(module) {
     private readonly List<Knockback> knockbacks = [];
     private readonly DoubleTroubleTrapStacks? doubleTroubleTrapStacks = module.FindComponent<DoubleTroubleTrapStacks>();
+    private DateTime activation;
+    private const double knockbackResolveTimer = 1.2f; // Used to clear up the pending knockback list
+    private BitMask debuffPlayers = default; // Tracks the players who have the stack debuffs as they shouldn't move as soon as it resolves
+
+    public override void OnEventCast(Actor caster, ActorCastEvent spell) {
+        if (spell.Action.ID == (uint)AID.DoubleTroubleTrapStack) {
+            var target = Raid.FindSlot(spell.MainTargetID);
+            activation = WorldState.CurrentTime.AddSeconds(knockbackResolveTimer);
+            debuffPlayers.Set(target);
+        }
+    }
 
     public override ReadOnlySpan<Knockback> ActiveKnockbacks(int slot, Actor actor) {
         knockbacks.Clear();
@@ -128,5 +144,31 @@ sealed class DoubleTroubleTrapKnockback(BossModule module) : Components.GenericK
         }
 
         return CollectionsMarshal.AsSpan(knockbacks);
+    }
+
+    public override void Update() {
+        // Once activation is set back to default clear the debuff player bitMask so they can move around
+        if (activation == default) {
+            debuffPlayers.Reset();
+            return;
+        }
+
+        if (WorldState.CurrentTime <= activation) {
+            return;
+        }
+
+        // Clears all the players pending knockbacks
+        var party = Raid.WithoutSlot();
+        for (var i = 0; i < party.Length; i++) {
+            ref var p = ref party[i];
+            p.PendingKnockbacks.Clear();
+        }
+        activation = default;
+    }
+
+    public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
+        if (debuffPlayers[slot]) {
+            hints.ForcedMovement = new(0);
+        }
     }
 }

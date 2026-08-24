@@ -695,12 +695,13 @@ sealed class DMUStates : StateMachineBuilder
             .ActivateOnEnter<BlizzardIIIBlowout>();
 
         ComponentCondition<DoubleTroubleTrapStacks>(id + 0x80, 1.0f, static o => o.NumCasts == 2, "Stacks + Knockbacks")
-            .DeactivateOnExit<DoubleTroubleTrapStacks>()
-            .DeactivateOnExit<DoubleTroubleTrapKnockback>()
+            .ExecOnExit<DoubleTroubleTrapStacks>(static o => o.active = false)
             .ExecOnExit<BlizzardIIIBlowout>(static o => o.Risky = true)
             .ExecOnExit<LightningSafeSpots>(static o => o.Risky = true);
 
         ComponentCondition<BlizzardIIIBlowout>(id + 0x90, 3.9f, static o => o.NumCasts > 0, "Blizzard + Lightning safe spots")
+            .DeactivateOnExit<DoubleTroubleTrapStacks>()
+            .DeactivateOnExit<DoubleTroubleTrapKnockback>()
             .DeactivateOnExit<LightningSafeSpots>()
             .DeactivateOnExit<BlizzardIIIBlowout>()
             .ActivateOnExit<HyperDrive>(); // Activated early for pre-position movement

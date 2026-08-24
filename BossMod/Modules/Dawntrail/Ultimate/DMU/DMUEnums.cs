@@ -72,7 +72,7 @@ public enum AID : uint {
     UnmitigatedExplosion = 47787, // Helper->self, no cast, range 100 circle
 
     DoubleTroubleTrap = 47782, // Kefka->self, 3.0s cast, single-target
-    DoubleTroubleTrap1 = 47783, // Helper->player, no cast, range 6 circle
+    DoubleTroubleTrapStack = 47783, // Helper->player, no cast, range 6 circle
 
     ThrummingThunderIII = 47775, // Helper->self, 5.0s cast, range 40 width 10 rect
     ThrummingThunderIII1 = 47777, // Helper->self, 5.0s cast, range 40 width 10 rect
