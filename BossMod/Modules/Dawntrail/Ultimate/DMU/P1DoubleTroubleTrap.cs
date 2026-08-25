@@ -1,7 +1,9 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
 sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStackSpread(module, 6.0f, 0.0f, 4, 4) {
-    public bool active = false;
+    // Used for when we are interested in showing the mechanic, not really needed since we can just use the base Active variable, but helps with
+    // handling the state machine and keeping the DoubleTroubleTrap components together so it is clear what is happening
+    public bool resolving = false;
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
     private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
     public int NumCasts = 0;
@@ -42,7 +44,7 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
     }
 
     public override void DrawArenaForeground(int pcSlot, Actor pc) {
-        if (!active) {
+        if (!resolving || !Active) {
             return;
         }
 
@@ -71,7 +73,7 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
     }
 
     public override void AddHints(int slot, Actor actor, TextHints hints) {
-        if (!active) {
+        if (!resolving || !Active) {
             return;
         }
 
@@ -79,7 +81,7 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
     }
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
-        if (!active) {
+        if (!resolving || !Active) {
             return;
         }
 
@@ -102,7 +104,7 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
     }
 
     public override PlayerPriority CalcPriority(int pcSlot, Actor pc, int playerSlot, Actor player, ref uint customColor) {
-        if (!active) {
+        if (!resolving || !Active) {
             return PlayerPriority.Irrelevant;
         }
 
@@ -133,7 +135,7 @@ sealed class DoubleTroubleTrapKnockback(BossModule module) : Components.GenericK
     public override ReadOnlySpan<Knockback> ActiveKnockbacks(int slot, Actor actor) {
         knockbacks.Clear();
 
-        if (doubleTroubleTrapStacks == null || !doubleTroubleTrapStacks.active) {
+        if (doubleTroubleTrapStacks == null || !doubleTroubleTrapStacks.resolving) {
             return [];
         }
 

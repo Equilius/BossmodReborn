@@ -32,28 +32,26 @@ sealed class RevoltingRuinIIIFirst(BossModule module) : Components.BaitAwayIcon(
             return;
         }
 
-        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we shouldn't make other roles move like they would
-        // This will also prevent them from being around true north when the TB is resolving otherwise you might scare the tank for being so close
-        if (actor.Role != Role.Tank && CurrentBaits.Count > 0) {
-            hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 10.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()),
-                CurrentBaits[0].Activation);
-            return;
-        }
-
-        // Backup since other tank might be dead in some cases, so it will go on the other tank which is wrong in terms of the AI settings
-        if (IsBaitTarget(actor) && CurrentBaits.Count > 0) {
-            NorthAIHints.AddForbiddenZone(Module, hints, PositionAIRadius.SEMI_PRECISE, CurrentBaits[0].Activation);
-            return;
-        }
-
         var slots = partyConfig.SlotsPerAssignment(Raid);
         if (slots.Length == 0) {
             return;
         }
 
+        // Movement for the tank that is taking the tank buster
         if (assignment == (dmuConfig.P1RevoltingRuinIIIBait1OT ? PartyRolesConfig.Assignment.OT : PartyRolesConfig.Assignment.MT)) {
             NorthAIHints.AddGoalZone(Module, hints, PositionAIRadius.SEMI_PRECISE);
+            return;
         }
+
+        // Backup since the tank that is expected to take it might be dead, so I guess it should attempt to adjust for it. The adjustment will only be for the
+        // other tank and not any other roles to prevent other roles movement looking odd (other roles should be surprised to have gotten the TB)
+        if (IsBaitTarget(actor) && CurrentBaits.Count > 0 && actor.Role == Role.Tank) {
+            NorthAIHints.AddForbiddenZone(Module, hints, PositionAIRadius.SEMI_PRECISE, CurrentBaits[0].Activation);
+            return;
+        }
+
+        // Movement for everyone else (including the tank who is not taking the tank buster)
+        hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 20.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()));
     }
 }
 
@@ -63,6 +61,7 @@ sealed class RevoltingRuinIIISecond : Components.GenericBaitAway {
     private DateTime activation;
     private AOEShape shape = new AOEShapeCone(100.0f, 60.0f.Degrees());
     private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
+    private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
 
     public RevoltingRuinIIISecond(BossModule module) : base(module, (uint)AID.RevoltingRuinIIISecondHit, true, true, true, false,
         AIHints.PredictedDamageType.Tankbuster) {
@@ -119,17 +118,26 @@ sealed class RevoltingRuinIIISecond : Components.GenericBaitAway {
             return;
         }
 
-        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we shouldn't make other roles move like they would
-        // This will also prevent them from being around true north when the TB is resolving otherwise you might scare the tank for being so close
-        if (actor.Role != Role.Tank && CurrentBaits.Count > 0) {
-            hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 10.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()),
-                CurrentBaits[0].Activation);
+        var slots = partyConfig.SlotsPerAssignment(Raid);
+        if (slots.Length == 0) {
             return;
         }
 
-        if (IsBaitTarget(actor) && CurrentBaits.Count > 0) {
-            NorthAIHints.AddForbiddenZone(Module, hints, PositionAIRadius.SEMI_PRECISE, CurrentBaits[0].Activation);
+        // Movement for the tank that is taking the tank buster
+        if (assignment == (dmuConfig.P1RevoltingRuinIIIBait1OT ? PartyRolesConfig.Assignment.OT : PartyRolesConfig.Assignment.MT)) {
+            NorthAIHints.AddGoalZone(Module, hints, PositionAIRadius.SEMI_PRECISE);
+            return;
         }
+
+        // Backup since the tank that is expected to take it might be dead, so I guess it should attempt to adjust for it. The adjustment will only be for the
+        // other tank and not any other roles to prevent other roles movement looking odd (other roles should be surprised to have gotten the TB)
+        if (IsBaitTarget(actor) && CurrentBaits.Count > 0 && actor.Role == Role.Tank) {
+            NorthAIHints.AddForbiddenZone(Module, hints, PositionAIRadius.SEMI_PRECISE, CurrentBaits[0].Activation);
+            return;
+        }
+
+        // Movement for everyone else (including the tank who is not taking the tank buster)
+        hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 20.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()));
     }
 }
 
@@ -176,27 +184,25 @@ sealed class HyperDrive(BossModule module) : Components.GenericBaitAway(module, 
             return;
         }
 
-        // This movement should only be for tank roles, if the pull is going badly and both tanks are dead, we shouldn't make other roles move like they would
-        // This will also prevent them from being around true north when the TB is resolving otherwise you might scare the tank for being so close
-        if (actor.Role != Role.Tank && CurrentBaits.Count > 0) {
-            hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 10.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()),
-                CurrentBaits[0].Activation);
-            return;
-        }
-
-        // Backup since other tank might be dead in some cases, so it will go on the other tank which is wrong in terms of the AI settings
-        if (IsBaitTarget(actor) && CurrentBaits.Count > 0) {
-            NorthAIHints.AddForbiddenZone(Module, hints,  PositionAIRadius.SEMI_PRECISE, CurrentBaits[0].Activation);
-            return;
-        }
-
         var slots = partyConfig.SlotsPerAssignment(Raid);
         if (slots.Length == 0) {
             return;
         }
 
+        // Movement for the tank that is taking the tank buster
         if (assignment == (dmuConfig.P1HyperDriveBait1OT ? PartyRolesConfig.Assignment.OT : PartyRolesConfig.Assignment.MT)) {
             NorthAIHints.AddGoalZone(Module, hints, PositionAIRadius.SEMI_PRECISE);
+            return;
         }
+
+        // Backup since the tank that is expected to take it might be dead, so I guess it should attempt to adjust for it. The adjustment will only be for the
+        // other tank and not any other roles to prevent other roles movement looking odd (other roles should be surprised to have gotten the TB)
+        if (IsBaitTarget(actor) && CurrentBaits.Count > 0 && actor.Role == Role.Tank) {
+            NorthAIHints.AddForbiddenZone(Module, hints, PositionAIRadius.SEMI_PRECISE, CurrentBaits[0].Activation);
+            return;
+        }
+
+        // Movement for everyone else (including the tank who is not taking the tank buster)
+        hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 20.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()));
     }
 }
