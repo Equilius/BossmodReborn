@@ -31,15 +31,15 @@ public sealed class DMUConfig : ConfigNode {
     public bool P1DoubleTroubleKnockbackHints = false;
 
     public enum P1GravenImage2Strategy {
-        [PropertyDisplay("Normal Graven Image 2")]
-        GravenImage2Normal,
+        [PropertyDisplay("None")]
+        GravenImage2None,
 
-        [PropertyDisplay("Uptime Graven Image 2")]
-        GravenImage2Uptime,
+        [PropertyDisplay("LPDU - Uptime Graven Image 2")]
+        GravenImage2LPDUUptime,
     }
 
     [PropertyDisplay("P1 Graven Image 2 strategy")]
-    public P1GravenImage2Strategy P1GravenImage2 = P1GravenImage2Strategy.GravenImage2Uptime;
+    public P1GravenImage2Strategy P1GravenImage2 = P1GravenImage2Strategy.GravenImage2None;
 
     public enum P1TeleTrouncingStrategy {
         [PropertyDisplay("Modified Xolo")]

@@ -77,3 +77,26 @@ public class P1DoubleTroubleKnockBackData {
         [Role.Tank] = (new WPos(92.000f, 100.000f), new  WPos(95.000f, 100.000f)),
     };
 }
+
+public class P1GravitasData {
+    public enum Side { NONE, NORTH, SOUTH }
+
+    public static IReadOnlyDictionary<Side, WPos> PuddlesSpots => puddleSpots;
+    public static IReadOnlyDictionary<PartyRolesConfig.Assignment, (WPos north, WPos south)> SpreadSafeSpots => spreadSafeSpots;
+
+    private static readonly Dictionary<Side, WPos> puddleSpots = new() {
+        [Side.NORTH] = new WPos(100.000f, 91.5f),
+        [Side.SOUTH] = new WPos(100.000f, 108.5f),
+    };
+
+    private static readonly Dictionary<PartyRolesConfig.Assignment, (WPos north, WPos south)> spreadSafeSpots = new() {
+        [PartyRolesConfig.Assignment.M1] = (new WPos(108.500f, 100.000f), new WPos(91.500f, 100.000f)),
+        [PartyRolesConfig.Assignment.MT] = (new WPos(108.500f, 100.000f), new WPos(91.500f, 100.000f)),
+        [PartyRolesConfig.Assignment.M2] = (new WPos(91.500f, 100.000f), new WPos(108.500f, 100.000f)),
+        [PartyRolesConfig.Assignment.OT] = (new WPos(91.500f, 100.000f), new WPos(108.500f, 100.000f)),
+        [PartyRolesConfig.Assignment.R1] = (new WPos(113.500f, 87.500f), new WPos(86.500f, 112.500f)),
+        [PartyRolesConfig.Assignment.H1] = (new WPos(113.500f, 87.500f), new WPos(86.500f, 112.500f)),
+        [PartyRolesConfig.Assignment.R2] = (new WPos(86.500f, 87.500f), new WPos(113.500f, 112.500f)),
+        [PartyRolesConfig.Assignment.H2] = (new WPos(86.500f, 87.500f), new WPos(113.500f, 112.500f)),
+    };
+}
