@@ -309,7 +309,7 @@ public abstract class BossModule : IDisposable
         // draw borders
         if (WindowConfig.ShowBorder)
         {
-            Arena.AddComplexPolygon(Bounds.Shape, haveRisks && WindowConfig.ShowBorderRisk ? Colors.Enemy : Colors.Border, 2f, false);
+            Dx11ArenaRenderer.AppendArenaOutline(haveRisks && WindowConfig.ShowBorderRisk ? Colors.Enemy : Colors.Border, 2f);
         }
 
         if (WindowConfig.ShowCardinals)
@@ -441,7 +441,7 @@ public abstract class BossModule : IDisposable
     protected virtual void UpdateModule() { }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected Actor? GetActor(uint enemy)
+    internal Actor? GetActor(uint enemy)
     {
         var b = Enemies(enemy);
         return b.Count != 0 ? b[0] : null;
@@ -595,6 +595,10 @@ public abstract class BossModule : IDisposable
 
     private void DrawWaymarks()
     {
+        var fontsize = WindowConfig.WaymarkFontSize;
+        var showOutlines = WindowConfig.ShowOutlinesAndShadows;
+        var shadows = showOutlines ? Colors.Shadows : 0u;
+        var outlinewidth = showOutlines ? 1.5f : 0f;
         DrawWaymark(WorldState.Waymarks[Waymark.A], "A", Colors.WaymarkA);
         DrawWaymark(WorldState.Waymarks[Waymark.B], "B", Colors.WaymarkB);
         DrawWaymark(WorldState.Waymarks[Waymark.C], "C", Colors.WaymarkC);
@@ -610,11 +614,7 @@ public abstract class BossModule : IDisposable
             if (position?.XZ() is Vector2 vec2)
             {
                 WPos pos = new(vec2);
-                if (WindowConfig.ShowOutlinesAndShadows)
-                {
-                    Arena.TextWorld(pos, text, Colors.Shadows, WindowConfig.WaymarkFontSize + 3f);
-                }
-                Arena.TextWorld(pos, text, color, WindowConfig.WaymarkFontSize);
+                Arena.TextWorld(pos, text, color, fontsize, shadows, outlinewidth);
             }
         }
     }
@@ -636,7 +636,7 @@ public abstract class BossModule : IDisposable
                 var pos = Arena.WorldPositionToScreenPosition(actor.Position);
                 var scale = WindowConfig.ArenaScale * 24f;
 
-                ImGui.GetWindowDrawList().AddImage(wrap.Handle, pos - new Vector2(scale), pos);
+                Arena.SpriteScreen(pos - new Vector2(scale), pos, wrap);
             }
         }
     }

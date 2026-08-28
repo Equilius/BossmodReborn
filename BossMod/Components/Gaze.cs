@@ -1,5 +1,3 @@
-﻿using Dalamud.Bindings.ImGui;
-
 namespace BossMod.Components;
 
 // generic gaze/weakpoint component, allows customized 'eye' position
@@ -12,7 +10,7 @@ public abstract class GenericGaze(BossModule module, uint aid = default) : CastC
         Angle forward = default, // if non-zero, treat specified side as 'forward' for hit calculations
         float range = 10000f,
         bool inverted = false,
-        ulong actorID = default)
+        ulong actorID = default, WPos? eyeCenter = null)
     {
         public readonly WPos Position = position;
         public readonly DateTime Activation = activation;
@@ -20,16 +18,19 @@ public abstract class GenericGaze(BossModule module, uint aid = default) : CastC
         public readonly float Range = range;
         public readonly bool Inverted = inverted;
         public readonly ulong ActorID = actorID;
+        public readonly WPos? EyeCenter = eyeCenter; // optional world position where the eye should be drawn
     }
 
-    private const float _eyeOuterH = 10f, _eyeOuterV = 6f, _eyeInnerR = 4f;
-    private const float _eyeOuterR = (_eyeOuterH * _eyeOuterH + _eyeOuterV * _eyeOuterV) / (2f * _eyeOuterV);
-    private const float _eyeOffsetV = _eyeOuterR - _eyeOuterV;
-
-    private const float _eyeHalfAngle = 1.080839f; // (float)Math.Asin(_eyeOuterH / _eyeOuterR);
-    private static readonly Vector2 offset = new(default, _eyeOffsetV);
-    private const float halfPIHalfAngleP = Angle.HalfPi + _eyeHalfAngle;
-    private const float halfPIHalfAngleM = Angle.HalfPi - _eyeHalfAngle;
+    private const float _eyeOuterH = 10f;
+    private const float _eyeOuterV = 6f;
+    private const float _eyeBorder = 1.15f;
+    private const float _eyeIrisR = 3.25f;
+    private const float _eyePupilR = 1.65f;
+    private const float _eyeHighlightR = 0.72f;
+    private const float _eyeShadowOffsetY = 1.15f;
+    private const uint _eyePupil = 0xFF101010;
+    private const uint _eyeHighlight = 0xF8FFFFFF;
+    private const uint _eyeShadow = 0x50000000;
 
     public abstract ReadOnlySpan<Eye> ActiveEyes(int slot, Actor actor);
 
@@ -52,15 +53,22 @@ public abstract class GenericGaze(BossModule module, uint aid = default) : CastC
     {
         var eyes = ActiveEyes(slot, actor);
         var len = eyes.Length;
+        if (len == 0)
+        {
+            return;
+        }
+
+        var pos = actor.Position;
         for (var i = 0; i < len; ++i)
         {
             ref readonly var eye = ref eyes[i];
-            if (actor.Position.InCircle(eye.Position, eye.Range))
+            var eyePos = eye.Position;
+            if (pos.InCircle(eyePos, eye.Range))
             {
-                var direction = eye.Inverted ? Angle.FromDirection(actor.Position - eye.Position) - eye.Forward
-                    : Angle.FromDirection(eye.Position - actor.Position) - eye.Forward;
+                var inv = eye.Inverted;
+                var direction = inv ? Angle.FromDirection(pos - eyePos) - eye.Forward : Angle.FromDirection(eyePos - pos) - eye.Forward;
 
-                var angle = eye.Inverted ? 135f.Degrees() : 45f.Degrees();
+                var angle = inv ? 135f.Degrees() : 45f.Degrees();
                 hints.ForbiddenDirections.Add((direction, angle, eye.Activation));
             }
         }
@@ -70,44 +78,71 @@ public abstract class GenericGaze(BossModule module, uint aid = default) : CastC
     {
         var eyes = ActiveEyes(pcSlot, pc);
         var len = eyes.Length;
+        if (len == 0)
+        {
+            return;
+        }
+        var rot = pc.Rotation;
+        var pcpos = pc.Position;
+
         for (var i = 0; i < len; ++i)
         {
             ref readonly var eye = ref eyes[i];
             var danger = HitByEye(ref pc, eye) != eye.Inverted;
-            var eyeCenter = IndicatorScreenPos(eye.Position);
-            DrawEye(eyeCenter, danger);
-
+            var eyePos = eye.EyeCenter ?? IndicatorWorldPos(eye.Position);
+            DrawEye(eyePos, danger);
+            var eyeF = eye.Forward;
             if (pc.Position.InCircle(eye.Position, eye.Range))
             {
                 var (min, max) = eye.Inverted ? (45f, 315f) : (-45f, 45f);
-                Arena.PathArcTo(pc.Position, 1f, (pc.Rotation + eye.Forward + min.Degrees()).Rad, (pc.Rotation + eye.Forward + max.Degrees()).Rad);
+                Arena.PathArcTo(pcpos, 1f, (rot + eyeF + min.Degrees()).Rad, (rot + eyeF + max.Degrees()).Rad);
                 MiniArena.PathStroke(false, Colors.Enemy);
             }
         }
     }
 
-    public static void DrawEye(Vector2 eyeCenter, bool danger)
+    public void DrawEye(WPos eyeCenter, bool danger)
     {
-        var dl = ImGui.GetWindowDrawList();
-        dl.PathArcTo(eyeCenter - offset, _eyeOuterR, halfPIHalfAngleP, halfPIHalfAngleM);
-        dl.PathArcTo(eyeCenter + offset, _eyeOuterR, -halfPIHalfAngleP, -halfPIHalfAngleM);
-        dl.PathFillConvex(danger ? Colors.Enemy : Colors.PC);
-        dl.AddCircleFilled(eyeCenter, _eyeInnerR, Colors.Border);
+        var bodyColor = danger ? Colors.Enemy : Colors.PC;
+        var centerOffset = eyeCenter - Arena.Center;
+
+        // All pieces are analytic screen-space instances and consecutive ScreenAnalytic segments merge into one instanced draw
+        Dx11ArenaRenderer.AppendArenaScreenEye(centerOffset, new Vector2(0f, _eyeShadowOffsetY), _eyeOuterH, _eyeOuterV, _eyeShadow);
+        Dx11ArenaRenderer.AppendArenaScreenEye(centerOffset, _eyeOuterH, _eyeOuterV, Colors.Border);
+        Dx11ArenaRenderer.AppendArenaScreenEye(centerOffset, _eyeOuterH - _eyeBorder, _eyeOuterV - _eyeBorder, bodyColor);
+
+        // the whole eye body is red/green. The inner circles only add depth/readability
+        Dx11ArenaRenderer.AppendArenaScreenCircle(centerOffset, _eyeIrisR, Colors.Border);
+        Dx11ArenaRenderer.AppendArenaScreenCircle(centerOffset, _eyePupilR, _eyePupil);
+        Dx11ArenaRenderer.AppendArenaScreenCircle(centerOffset, new Vector2(-0.9f, -0.9f), _eyeHighlightR, _eyeHighlight);
     }
 
     public static bool HitByEye(ref Actor actor, Eye eye) => (actor.Rotation + eye.Forward).ToDirection().Dot((eye.Position - actor.Position).Normalized()) >= 0.707107f; // 45-degree
 
-    private Vector2 IndicatorScreenPos(WPos eye)
+    internal WPos IndicatorWorldPos(WPos eye)
     {
-        if (Arena.InBounds(eye) || Arena.Bounds is not ArenaBoundsCircle && Arena.Bounds is ArenaBoundsCustom circle && !circle.IsCircle)
+        if (Arena.InBounds(eye))
         {
-            return Arena.WorldPositionToScreenPosition(eye);
+            return eye;
         }
-        else
+
+        var delta = eye - Arena.Center;
+        var lenSq = delta.LengthSq();
+        if (!(lenSq > 1e-8f))
         {
-            var dir = (eye - Arena.Center).Normalized();
-            return Arena.ScreenCenter + Arena.RotatedCoords(dir.ToVec2()) * (Arena.ScreenHalfSize + Arena.ScreenMarginSize * 0.5f);
+            return Arena.Center;
         }
+
+        var dir = delta / MathF.Sqrt(lenSq);
+        var t = Arena.IntersectRayBounds(Arena.Center, dir);
+        if (!(t >= 0f) || !float.IsFinite(t) || t == float.MaxValue)
+        {
+            return Arena.ClampToBounds(eye);
+        }
+
+        var screenScale = Arena.ScreenHalfSize * Arena.Bounds.InvRadius;
+        var marginWorld = Arena.ScreenMarginSize * 0.5f / screenScale;
+        return Arena.Center + (t + marginWorld) * dir;
     }
 }
 
@@ -133,7 +168,8 @@ public class CastGaze(BossModule module, uint aid, bool inverted = false, float 
     {
         if (spell.Action.ID == WatchedAction)
         {
-            Eyes.Add(new(spell.LocXZ, Module.CastFinishAt(spell), default, range, inverted, caster.InstanceID));
+            var loc = spell.LocXZ;
+            Eyes.Add(new(loc, Module.CastFinishAt(spell), default, range, inverted, caster.InstanceID));
         }
     }
 
@@ -169,10 +205,11 @@ public class CastGazes(BossModule module, uint[] aids, bool inverted = false, fl
         {
             if (spell.Action.ID == AIDs[i])
             {
-                Eyes.Add(new(spell.LocXZ, Module.CastFinishAt(spell), default, range, inverted, caster.InstanceID));
+                var loc = spell.LocXZ;
+                Eyes.Add(new(loc, Module.CastFinishAt(spell), default, range, inverted, caster.InstanceID));
                 if (Eyes.Count == ExpectedNumCasters)
                 {
-                    Eyes.Sort(static (a, b) => a.Activation.CompareTo(b.Activation));
+                    SortHelpers.SortEyesByActivation(Eyes);
                 }
                 return;
             }

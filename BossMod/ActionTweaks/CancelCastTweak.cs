@@ -8,6 +8,11 @@ public sealed class CancelCastTweak(WorldState ws, AIHints hints)
     private readonly WorldState _ws = ws;
     private DateTime _nextCancelAllowed;
 
+    public void Reset()
+    {
+        _nextCancelAllowed = default;
+    }
+
     public bool ShouldCancel(DateTime currentTime, bool force)
     {
         if (currentTime < _nextCancelAllowed)
@@ -37,6 +42,10 @@ public sealed class CancelCastTweak(WorldState ws, AIHints hints)
             return false;
         }
 
+        // mount doesn't break movement as of 7.whatever
+        if (cast.Action.Type == ActionType.Mount)
+            return false;
+
         var target = _ws.Actors.Find(cast.TargetID);
         if (target == null)
         {
@@ -63,7 +72,11 @@ public sealed class CancelCastTweak(WorldState ws, AIHints hints)
         var hasRaiseStatus = false;
         foreach (var s in target.Statuses)
         {
-            if (s.ID is 148 or 1140) { hasRaiseStatus = true; break; }
+            if (s.ID is 148 or 1140)
+            {
+                hasRaiseStatus = true;
+                break;
+            }
         }
 
         return !target.IsDead || hasRaiseStatus;

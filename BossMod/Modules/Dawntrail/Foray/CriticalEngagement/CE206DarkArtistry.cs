@@ -3,10 +3,10 @@
 public enum OID : uint
 {
     PhantomNecromancer = 0x4BC1,
-    Helper = 0x233C,
     LongDeadExplorer = 0x4BC2, // R1.000, x0 (spawn during fight)
     LongDeadPirate = 0x4BC3, // R2.600, x0 (spawn during fight)
     PhantomNecromancer1 = 0x4C75, // R1.000, x1
+    Helper = 0x233C
 }
 
 public enum AID : uint
@@ -134,7 +134,7 @@ sealed class CE206DarkArtistryStates : StateMachineBuilder
     SortOrder = 9,
     PlanLevel = 0)]
 [SkipLocalsInit]
-public sealed class CE206DarkArtistry(WorldState ws, Actor primary) : BossModule(ws, primary, new(224.000f, -860.000f), new ArenaBoundsSquare(20f))
+public sealed class CE206DarkArtistry(WorldState ws, Actor primary) : BossModule(ws, primary, new(224f, -860f), new ArenaBoundsSquare(20f))
 {
     protected override bool CheckPull() => base.CheckPull() && Raid.Player()!.Position.InSquare(Arena.Center, 20f);
 }

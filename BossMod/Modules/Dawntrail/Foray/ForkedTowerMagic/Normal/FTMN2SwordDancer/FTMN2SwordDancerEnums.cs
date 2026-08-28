@@ -5,6 +5,7 @@ public enum OID : uint
     SwordDancer = 0x4D76, // R6.000, x1
     Helper = 0x233C, // R0.500, x29, Helper type
     DancingSwordCyclosword = 0x4D79, // R2.000, x3
+    DancingSwordSteelsbreath = 0x4D7A, // R1.000, x5
     DancingSwordSurgesword = 0x4D7C, // R2.000, x16
     SwordDanceMarker = 0x1EC033, // R0.500, x0 (spawn during fight), EventObj type
 }
@@ -29,8 +30,9 @@ public enum AID : uint
     CycloswordsUnsheathed = 49586, // SwordDancer->self, 3.0s cast, single-target
     Cycloswords = 49587, // SwordDancer->self, 3.0s cast, single-target
     Spin = 49589, // DancingSword3->self, 1.0s cast, range 15-60 donut
-    Spin1 = 49592, // DancingSword3->self, 1.0s cast, range 15 circle
-    Spin2 = 49593, // DancingSword3->self, 1.0s cast, range 20 circle
+    Spin1 = 49590, // DancingSwordCyclosword->self, 1.0s cast, range 20-60 donut
+    Spin2 = 49592, // DancingSword3->self, 1.0s cast, range 15 circle
+    Spin3 = 49593, // DancingSword3->self, 1.0s cast, range 20 circle
 
     SwordDanceCast = 49609, // SwordDancer->self, 4.4+0.6s cast, single-target
     SwordDance = 49614, // DancingSword5->self, 1.5s cast, range 60 width 20 rect

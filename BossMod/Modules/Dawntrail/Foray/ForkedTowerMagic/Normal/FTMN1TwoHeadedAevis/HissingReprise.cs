@@ -2,26 +2,27 @@
 
 sealed class HissingReprise(BossModule module) : Components.GenericKnockback(module)
 {
-    private readonly PoisonBreath poison = module.FindComponent<PoisonBreath>()!;
-    private readonly IceCluster ice = module.FindComponent<IceCluster>()!;
-    private readonly LightningCluster lightning = module.FindComponent<LightningCluster>()!;
+    private readonly LightningIcePoison lip = module.FindComponent<LightningIcePoison>()!;
     private readonly HypothermalCombustionShock hyposhock = module.FindComponent<HypothermalCombustionShock>()!;
+    private readonly StormsBreath storm = module.FindComponent<StormsBreath>()!;
     private DateTime activation = default;
     private BitMask easterly;
     private BitMask westerly;
-    private readonly AOEShapeCircle pShape = new(18f);
-    private readonly AOEShapeCircle cShape = new(15f);
 
     public override ReadOnlySpan<Knockback> ActiveKnockbacks(int slot, Actor actor)
     {
-        List<Knockback> kb = [with(1)];
-        if (easterly[slot])
+        List<Knockback> kb = [with(2)];
+
+        if (easterly[slot] || westerly[slot])
         {
-            kb.Add(new(new(-880f, Arena.Center.Z), 21f, activation, kind: Kind.DirRight));
-        }
-        else if (westerly[slot])
-        {
-            kb.Add(new(new(-920f, Arena.Center.Z), 21f, activation, kind: Kind.DirLeft));
+            var posx = easterly[slot] ? -880f : -920f;
+            var kind = easterly[slot] ? Kind.DirRight : Kind.DirLeft;
+            kb.Add(new(new(posx, Arena.Center.Z), 21f, activation, kind: kind));
+            var s = storm.ActiveKnockbacks(slot, actor);
+            if (s.Length != 0)
+            {
+                kb.Add(s[0]);
+            }
         }
 
         return CollectionsMarshal.AsSpan(kb);
@@ -77,69 +78,44 @@ sealed class HissingReprise(BossModule module) : Components.GenericKnockback(mod
         var count = kbs.Length;
         if (count != 0)
         {
-            // knockback can happen by itself, poison breath, or clusters
-            // rect/circ slightly larger to avoid sus knockback
             var kb = kbs[0];
+            var direction = new WDir(kb.Kind == Kind.DirLeft ? 20f : -20f, 0f);
+            if (count == 2)
+            {
+                hints.AddForbiddenZone(new SDKnockbackInAABBSquareFixedDirectionIntoCircle(Arena.Center, direction, 19f, Arena.Center, 5f), kbs[0].Activation);
+                return;
+            }
+            // knockback can happen by itself, poison breath, or clusters
+            // rect/circ slightly larger to avoid sus knockback            
             if (!IsImmune(slot, kb.Activation))
             {
-                var direction = new WDir(kb.Kind == Kind.DirLeft ? 20f : -20f, 0f);
-
-                var p = GetPoisonPositions(slot, actor);
-                var pCount = p.Length;
-                if (pCount != 0)
+                var aoeinfo = GetCircleAOEInfo(slot, actor);
+                var origins = aoeinfo.Origins;
+                var aoecount = origins.Length;
+                if (aoeinfo.Origins.Length == 0)
                 {
-                    hints.AddForbiddenZone(new SDKnockbackInAABBSquareFixedDirectionPlusAOECircles(Arena.Center, direction, 19f, p, 19f, pCount), kb.Activation);
+                    hints.AddForbiddenZone(new SDKnockbackInAABBSquareFixedDirection(Arena.Center, direction, 19f), kb.Activation);
                 }
                 else
                 {
-                    var c = GetClusterPositions(slot, actor);
-                    var cCount = c.Length;
-                    if (cCount != 0)
-                    {
-                        hints.AddForbiddenZone(new SDKnockbackInAABBSquareFixedDirectionPlusAOECircles(Arena.Center, direction, 19f, c, 16f, cCount), kb.Activation);
-                    }
-                    else
-                    {
-                        hints.AddForbiddenZone(new SDKnockbackInAABBSquareFixedDirection(Arena.Center, direction, 19f), kb.Activation);
-                    }
+                    hints.AddForbiddenZone(new SDKnockbackInAABBSquareFixedDirectionPlusAOECircles(Arena.Center, direction, 19f, origins, aoeinfo.Radius, aoecount), kb.Activation);
                 }
             }
         }
     }
-
-    private WPos[] GetPoisonPositions(int slot, Actor actor)
+    private (WPos[] Origins, float Radius) GetCircleAOEInfo(int slot, Actor actor)
     {
+        // poison never happens at same time as ice/lightning
         List<WPos> pos = [];
-
-        var poisons = poison.ActiveAOEs(slot, actor);
-        var poisonCount = poisons.Length;
-        for (var i = 0; i < poisonCount; i++)
+        var radius = float.MinValue;
+        var aoes = lip.ActiveAOEs(slot, actor);
+        var count = aoes.Length;
+        for (var i = 0; i < count; i++)
         {
-            var aoe = poisons[i];
+            var aoe = aoes[i];
+            var shape = aoe.Shape as AOEShapeCircle;
             pos.Add(aoe.Origin);
-        }
-
-        return pos.ToArray();
-    }
-
-    private WPos[] GetClusterPositions(int slot, Actor actor)
-    {
-        List<WPos> pos = [];
-
-        var ices = ice.ActiveAOEs(slot, actor);
-        var iceCount = ices.Length;
-        for (var i = 0; i < iceCount; i++)
-        {
-            var aoe = ices[i];
-            pos.Add(aoe.Origin);
-        }
-
-        var lightnings = lightning.ActiveAOEs(slot, actor);
-        var lightningCount = lightnings.Length;
-        for (var i = 0; i < lightningCount; i++)
-        {
-            var aoe = lightnings[i];
-            pos.Add(aoe.Origin);
+            radius = shape?.Radius > radius ? shape.Radius : radius;
         }
 
         var orbs = hyposhock.ActiveAOEs(slot, actor);
@@ -147,30 +123,22 @@ sealed class HissingReprise(BossModule module) : Components.GenericKnockback(mod
         for (var i = 0; i < orbCount; i++)
         {
             var aoe = orbs[i];
+            var shape = aoe.Shape as AOEShapeCircle;
             pos.Add(aoe.Origin);
+            radius = shape?.Radius > radius ? shape.Radius : radius;
         }
 
-        return pos.ToArray();
+        return (pos.ToArray(), radius);
     }
-
     private bool InsideAOE(int slot, Actor actor, WPos to)
     {
-        var p = GetPoisonPositions(slot, actor);
-        var pCount = p.Length;
-
-        for (var i = 0; i < pCount; i++)
+        var aoes = GetCircleAOEInfo(slot, actor);
+        var count = aoes.Origins.Length;
+        var radius = aoes.Radius;
+        for (var i = 0; i < count; i++)
         {
-            if (pShape.Check(to, p[i]))
-            {
-                return true;
-            }
-        }
-
-        var c = GetClusterPositions(slot, actor);
-        var cCount = c.Length;
-        for (var i = 0; i < cCount; i++)
-        {
-            if (cShape.Check(to, c[i]))
+            var origin = aoes.Origins[i];
+            if (to.InCircle(origin, radius))
             {
                 return true;
             }

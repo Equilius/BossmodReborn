@@ -1,4 +1,5 @@
-﻿using Dalamud.Bindings.ImGui;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Interface;
 
 namespace BossMod;
@@ -13,8 +14,6 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
 {
     public static readonly BossModuleConfig Config = Service.Config.Get<BossModuleConfig>();
     private WPos _center = center;
-    private readonly TriangulationCache _triCache = new();
-    private readonly PolygonCache _polyCache = new();
 
     public WPos Center
     {
@@ -24,8 +23,6 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
             if (_center != value)
             {
                 _center = value;
-                _triCache.Invalidate();
-                _polyCache.Invalidate();
             }
         }
     }
@@ -40,8 +37,6 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
             {
                 _bounds = value;
                 _bounds.ScreenHalfSize = ScreenHalfSize; // ensure arena bounds are fully initialized before doing anything else
-                _triCache.Invalidate();
-                _polyCache.Invalidate();
             }
         }
     }
@@ -55,14 +50,40 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
     private float _cameraSinAzimuth;
     private float _cameraCosAzimuth = 1f;
 
+    // Frame-constant rendering state, populated once by Begin().
+    private float _scaledCos;
+    private float _scaledSin;
+    private float _frameArenaScale = 1f;
+    private float _frameThicknessScale = 1f;
+    private float _frameActorScale = 1f;
+    private float _frameScreenHalfSize;
+    private float _frameScreenMarginSize;
+    private float _frameCardinalsFontSize = 17f;
+    private bool _frameShowOutlinesAndShadows;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool InBounds(WPos position) => _bounds.Contains(position - _center);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public WPos ClampToBounds(WPos position) => _center + _bounds.ClampToBounds(position - _center);
-    public float IntersectRayBounds(WPos rayOrigin, WDir rayDir) => _bounds.IntersectRay(rayOrigin - _center, rayDir);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public float IntersectRayBounds(WPos rayOrigin, in WDir rayDir) => _bounds.IntersectRay(rayOrigin - _center, rayDir);
 
     // prepare for drawing - set up internal state, clip rect etc.
     public void Begin(Angle cameraAzimuth)
     {
-        var centerOffset = new Vector2(ScreenMarginSize + Config.SlackForRotations * ScreenHalfSize);
+        // Snapshot renderer-facing configuration once per arena frame. Most primitive methods are hot
+        // and do not need to re-read the config object for values that cannot meaningfully change
+        // halfway through one Begin/End pair.
+        var arenaScale = Config.ArenaScale;
+        _frameArenaScale = arenaScale;
+        _frameThicknessScale = Config.ThicknessScale;
+        _frameActorScale = Config.ActorScale;
+        _frameShowOutlinesAndShadows = Config.ShowOutlinesAndShadows;
+        _frameCardinalsFontSize = Config.CardinalsFontSize;
+        var screenHalfSize = _frameScreenHalfSize = 150f * arenaScale;
+        var screenMarginSize = _frameScreenMarginSize = 20f * arenaScale;
+
+        var centerOffset = new Vector2(screenMarginSize + Config.SlackForRotations * screenHalfSize);
         var fullSize = 2f * centerOffset;
         var currentWindowSize = ImGui.GetWindowSize();
         var requiredWindowSize = Vector2.Max(fullSize, currentWindowSize);
@@ -70,33 +91,42 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
         var cursor = ImGui.GetCursorScreenPos();
         ImGui.Dummy(fullSize);
 
-        if (_bounds.ScreenHalfSize != ScreenHalfSize)
+        if (_bounds.ScreenHalfSize != screenHalfSize)
         {
-            _bounds.ScreenHalfSize = ScreenHalfSize;
-            _triCache.Invalidate();
-            _polyCache.Invalidate();
-        }
-        else
-        {
-            _triCache.NextFrame();
+            _bounds.ScreenHalfSize = screenHalfSize;
         }
 
-        ScreenCenter = cursor + centerOffset;
+        var screenCenter = cursor + centerOffset;
+        ScreenCenter = screenCenter;
 
         _cameraAzimuth = cameraAzimuth;
         (_cameraSinAzimuth, _cameraCosAzimuth) = MathF.SinCos(cameraAzimuth.Rad);
+
+        var screenScale = screenHalfSize * _bounds.InvRadius;
+        var scaledCos = _cameraCosAzimuth * screenScale;
+        var scaledSin = _cameraSinAzimuth * screenScale;
+        var centerX = screenCenter.X;
+        var centerY = screenCenter.Y;
+
+        _scaledCos = scaledCos;
+        _scaledSin = scaledSin;
+
+        var drawList = ImGui.GetWindowDrawList();
+
         var wmin = ImGui.GetWindowPos();
         var wmax = wmin + ImGui.GetWindowSize();
-        ImGui.GetWindowDrawList().PushClipRect(Vector2.Max(cursor, wmin), Vector2.Min(cursor + fullSize, wmax));
+        drawList.PushClipRect(Vector2.Max(cursor, wmin), Vector2.Min(cursor + fullSize, wmax));
+
+        // Start our custom DX11 arena renderer. Arena background, border and stencil clipping all
+        // share the cached arena SDF. Arena shapes are considered immutable, so object identity is the cache key.
+        Dx11ArenaRenderer.BeginArena(drawList, _bounds.Shape, centerX, centerY, _scaledCos, _scaledSin, screenScale);
 
         if (Config.OpaqueArenaBackground)
         {
-            Zone(_bounds.ShapeTriangulation, Colors.Background);
+            Dx11ArenaRenderer.AppendArenaBackground(Colors.Background);
         }
     }
 
-    // if you are 100% sure your primitive does not need clipping, you can use drawlist api directly
-    // this helper allows converting world-space coords to screen-space ones
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector2 WorldPositionToScreenPosition(WPos p) => ScreenCenter + WorldOffsetToScreenOffset(p - _center);
 
@@ -112,71 +142,76 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Vector2 WorldOffsetToScreenOffset(WDir worldOffset) => ScreenHalfSize * RotatedCoords(new(worldOffset.X, worldOffset.Z)) * _bounds.InvRadius;
+    private Vector2 WorldOffsetToScreenOffset(WDir worldOffset)
+    {
+        var wx = worldOffset.X;
+        var wz = worldOffset.Z;
+        return new(wx * _scaledCos - wz * _scaledSin, wz * _scaledCos + wx * _scaledSin);
+    }
 
-    // unclipped primitive rendering that accept world-space positions; thin convenience wrappers around drawlist api
+    // Unclipped primitive rendering that accepts world-space positions
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddLine(WPos a, WPos b, uint color = default, float thickness = 1f)
     {
-        thickness *= Config.ThicknessScale;
-        if (Config.ShowOutlinesAndShadows)
-        {
-            ImGui.GetWindowDrawList().AddLine(WorldPositionToScreenPosition(a), WorldPositionToScreenPosition(b), Colors.Shadows, thickness + 1f);
-        }
-
-        ImGui.GetWindowDrawList().AddLine(WorldPositionToScreenPosition(a), WorldPositionToScreenPosition(b), color != default ? color : Colors.Danger, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Span<WDir> points = [a - _center, b - _center];
+        Dx11ArenaRenderer.AppendPolyline(points, false, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void AddCircleUnfilled(WPos center, float radius, uint color = default, float thickness = 1f)
+    {
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendCircleOutlineUnclipped(center - _center, radius, lineColor, lineThickness, shadowColor, shadowThickness);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddTriangle(WPos p1, WPos p2, WPos p3, uint color = default, float thickness = 1f)
     {
-        thickness *= Config.ThicknessScale;
-        ImGui.GetWindowDrawList().AddTriangle(WorldPositionToScreenPosition(p1), WorldPositionToScreenPosition(p2), WorldPositionToScreenPosition(p3), color != default ? color : Colors.Danger, thickness);
+        Dx11ArenaRenderer.AppendPrimitiveTriangleStroke(p1 - _center, p2 - _center, p3 - _center, color != default ? color : Colors.Danger, thickness * _frameThicknessScale);
     }
 
-    public void AddTriangleFilled(WPos p1, WPos p2, WPos p3, uint color = default) => ImGui.GetWindowDrawList().AddTriangleFilled(WorldPositionToScreenPosition(p1), WorldPositionToScreenPosition(p2), WorldPositionToScreenPosition(p3), color != default ? color : Colors.Danger);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void AddTriangleFilled(WPos p1, WPos p2, WPos p3, uint color = default)
+        => Dx11ArenaRenderer.AppendPrimitiveTriangle(p1 - _center, p2 - _center, p3 - _center, color != default ? color : Colors.Danger);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddQuad(WPos p1, WPos p2, WPos p3, WPos p4, uint color = default, float thickness = 1f)
     {
-        thickness *= Config.ThicknessScale;
-        ImGui.GetWindowDrawList().AddQuad(WorldPositionToScreenPosition(p1), WorldPositionToScreenPosition(p2), WorldPositionToScreenPosition(p3), WorldPositionToScreenPosition(p4), color != default ? color : Colors.Danger, thickness);
+        Dx11ArenaRenderer.AppendQuadStroke(p1 - _center, p2 - _center, p3 - _center, p4 - _center, color != default ? color : Colors.Danger, thickness * _frameThicknessScale);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddRect(WPos origin, WDir direction, float lenFront, float lenBack, float halfWidth, uint color, float thickness = 1f)
     {
-        thickness *= Config.ThicknessScale;
+        thickness *= _frameThicknessScale;
         var side = halfWidth * direction.OrthoR();
         var front = origin + lenFront * direction;
         var back = origin - lenBack * direction;
         AddQuad(front + side, front - side, back - side, back + side, color, thickness);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddPolygon(ReadOnlySpan<WPos> vertices, uint color = default, float thickness = 1f)
     {
-        thickness *= Config.ThicknessScale;
         var len = vertices.Length;
+        Span<WDir> local = stackalloc WDir[len];
         for (var i = 0; i < len; ++i)
         {
-            PathLineTo(vertices[i]);
+            local[i] = vertices[i] - _center;
         }
-
-        PathStroke(true, color != default ? color : Colors.Danger, thickness);
+        Dx11ArenaRenderer.AppendPolyline(local, true, color != default ? color : Colors.Danger, thickness * _frameThicknessScale);
     }
 
-    public void AddComplexPolygon(RelSimplifiedComplexPolygon poly, uint color = default, float thickness = 1f, bool addShadows = true)
+    public void AddComplexPolygon(RelSimplifiedComplexPolygon poly, uint color = default, float thickness = 1f)
     {
-        var colors = color != default ? color : Colors.Danger;
-
-        var dl = ImGui.GetWindowDrawList();
         var parts = CollectionsMarshal.AsSpan(poly.Parts);
         var len = parts.Length;
-        var showShadows = addShadows && Config.ShowOutlinesAndShadows;
-        var scale = Config.ThicknessScale;
-        var thickness_ = thickness;
-        var screencenter = ScreenCenter;
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
 
         for (var i = 0; i < len; ++i)
         {
             var part = parts[i];
-
             DrawContour(part.Exterior);
             var countH = part.HoleStarts.Count;
             for (var h = 0; h < countH; ++h)
@@ -187,438 +222,236 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void DrawContour(ReadOnlySpan<WDir> contour)
-        {
-            var len = contour.Length;
-            Span<Vector2> points = stackalloc Vector2[len];
-
-            for (var i = 0; i < len; ++i)
-            {
-                points[i] = screencenter + WorldOffsetToScreenOffset(contour[i]);
-            }
-
-            DrawPolygon(points);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void DrawPolygon(Span<Vector2> points)
-        {
-            fixed (Vector2* p = points)
-            {
-                var len = points.Length;
-                if (showShadows)
-                {
-                    dl.AddPolyline(p, len, Colors.Shadows, ImDrawFlags.Closed, (thickness + 1f) * scale);
-                }
-                dl.AddPolyline(p, len, colors, ImDrawFlags.Closed, thickness * scale);
-            }
-        }
+            => Dx11ArenaRenderer.AppendPolyline(contour, true, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
-    // path api: add new point to path; this adds new edge from last added point, or defines first vertex if path is empty
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void PathLineTo(WPos p) => ImGui.GetWindowDrawList().PathLineToMergeDuplicate(WorldPositionToScreenPosition(p));
+    public void PathLineTo(WPos p) => Dx11ArenaRenderer.PathLineTo(p - _center);
 
-    // adds a bunch of points corresponding to arc - if path is non empty, this adds an edge from last point to first arc point
-    public void PathArcTo(WPos center, float radius, float amin, float amax) => ImGui.GetWindowDrawList().PathArcTo(WorldPositionToScreenPosition(center), radius * _bounds.InvRadius * ScreenHalfSize, Angle.HalfPi - amin + _cameraAzimuth.Rad, Angle.HalfPi - amax + _cameraAzimuth.Rad);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void PathArcTo(WPos center, float radius, float amin, float amax) => Dx11ArenaRenderer.PathArcTo(center - _center, radius, amin, amax);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void PathStroke(bool closed, uint color = default, float thickness = 1f)
-    {
-        thickness *= Config.ThicknessScale;
-        ImGui.GetWindowDrawList().PathStroke(color != default ? color : Colors.Danger, closed ? ImDrawFlags.Closed : ImDrawFlags.None, thickness);
-    }
+        => Dx11ArenaRenderer.PathStroke(closed, color != default ? color : Colors.Danger, thickness * Config.ThicknessScale);
 
-    // draw clipped & triangulated zone
-    public void Zone(RelTriangle[] triangulation, uint color = default)
-    {
-        var drawlist = ImGui.GetWindowDrawList();
-        var restoreFlags = drawlist.Flags;
-        drawlist.Flags &= ~ImDrawListFlags.AntiAliasedFill;
-        var triangles = triangulation;
-        var len = triangles.Length;
-        var col = color != default ? color : Colors.AOE;
-        var center = ScreenCenter;
-
-        var cosAzimuth = _cameraCosAzimuth;
-        var sinAzimuth = _cameraSinAzimuth;
-        var screenHalfSize = ScreenHalfSize;
-        var invRadius = _bounds.InvRadius;
-
-        for (var i = 0; i < len; ++i)
-        {
-            ref readonly var tri = ref triangles[i];
-            var a = TransformCoords(tri.A);
-            var b = TransformCoords(tri.B);
-            var c = TransformCoords(tri.C);
-            drawlist.AddTriangleFilled(center + a, center + b, center + c, col);
-        }
-
-        drawlist.Flags = restoreFlags;
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        Vector2 TransformCoords(in WDir worldOffset)
-        {
-            var x0 = worldOffset.X;
-            var z0 = worldOffset.Z;
-            var x = x0 * cosAzimuth - z0 * sinAzimuth;
-            var z = z0 * cosAzimuth + x0 * sinAzimuth;
-            return screenHalfSize * new Vector2(x, z) * invRadius;
-        }
-    }
-
-    // draw zones - these are filled primitives clipped to arena border; note that triangulation is cached
+    // Filled zones:
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneCone(WPos center, float innerRadius, float outerRadius, Angle centerDirection, Angle halfAngle, uint color)
-    {
-        ref var tri = ref _triCache.Get(1, center, innerRadius, outerRadius, centerDirection, halfAngle);
+        => Dx11ArenaRenderer.AppendCone(center - _center, innerRadius, outerRadius, centerDirection.ToDirection(), halfAngle.Rad, color != default ? color : Colors.AOE);
 
-        tri ??= _bounds.ClipAndTriangulateCone(center - _center, innerRadius, outerRadius, centerDirection, halfAngle);
-        Zone(tri, color);
-    }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneCircle(WPos center, float radius, uint color)
-    {
-        ref var tri = ref _triCache.Get(2, center, radius);
-        if (tri == null)
-        {
-            var offset = center - _center;
-            tri = _bounds.Shape.PolygonCircleIntersection(offset, radius) switch
-            {
-                PolygonShapeRelation.Inside => _bounds.TriangulateCircle(offset, radius),
-                PolygonShapeRelation.Outside => [],
-                _ => _bounds.ClipAndTriangulateCircle(offset, radius),
-            };
-        }
-        Zone(tri, color);
-    }
+        => Dx11ArenaRenderer.AppendCircle(center - _center, radius, color != default ? color : Colors.AOE);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneDonut(WPos center, float innerRadius, float outerRadius, uint color)
-    {
-        ref var tri = ref _triCache.Get(3, center, innerRadius, outerRadius);
-        if (tri == null)
-        {
-            var offset = center - _center;
+        => Dx11ArenaRenderer.AppendDonut(center - _center, innerRadius, outerRadius, color != default ? color : Colors.AOE);
 
-            tri = _bounds.Shape.PolygonDonutIntersection(offset, innerRadius, outerRadius) switch
-            {
-                PolygonShapeRelation.Inside => _bounds.Triangulate(_bounds.DonutPolygon(offset, innerRadius, outerRadius)),
-                PolygonShapeRelation.Outside => [],
-                _ => _bounds.ClipAndTriangulateDonut(offset, innerRadius, outerRadius),
-            };
-        }
-        Zone(tri, color);
-    }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneTri(WPos a, WPos b, WPos c, uint color)
-    {
-        ref var tri = ref _triCache.Get(4, a, b, c);
-        tri ??= _bounds.ClipAndTriangulateTri(a - _center, b - _center, c - _center);
-        Zone(tri, color);
-    }
+        => Dx11ArenaRenderer.AppendTriangle(a - _center, b - _center, c - _center, color != default ? color : Colors.AOE);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneIsoscelesTri(WPos apex, WDir height, WDir halfBase, uint color)
     {
-        ref var tri = ref _triCache.Get(5, apex, height, halfBase);
-        tri ??= _bounds.ClipAndTriangulateIsoscelesTri(apex - _center, height, halfBase);
-        Zone(tri, color);
+        var a = apex - _center;
+        Dx11ArenaRenderer.AppendTriangle(a, a + height + halfBase, a + height - halfBase, color != default ? color : Colors.AOE);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneIsoscelesTri(WPos apex, Angle direction, Angle halfAngle, float height, uint color)
     {
-        ref var tri = ref _triCache.Get(6, apex, direction, halfAngle, height);
-        tri ??= _bounds.ClipAndTriangulateIsoscelesTri(apex - _center, direction, halfAngle, height);
-        Zone(tri, color);
+        var a = apex - _center;
+        var dir = direction.ToDirection();
+        var h = height * dir;
+        var halfBase = height * halfAngle.Tan() * dir.OrthoL();
+        Dx11ArenaRenderer.AppendTriangle(a, a + h + halfBase, a + h - halfBase, color != default ? color : Colors.AOE);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneRect(WPos origin, WDir direction, float lenFront, float lenBack, float halfWidth, uint color)
-    {
-        ref var tri = ref _triCache.Get(7, origin, direction, lenFront, lenBack, halfWidth);
-        if (tri == null)
-        {
-            var offset = origin - _center;
-            tri = _bounds.Shape.PolygonDirectionalRectIntersection(offset, direction, lenFront, lenBack, halfWidth) switch
-            {
-                PolygonShapeRelation.Inside => _bounds.TriangulateRect(offset, direction, lenFront, lenBack, halfWidth),
-                PolygonShapeRelation.Outside => [],
-                _ => _bounds.ClipAndTriangulateRect(offset, direction, lenFront, lenBack, halfWidth)
-            };
-        }
-        Zone(tri, color);
-    }
+        => Dx11ArenaRenderer.AppendRect(origin - _center, direction, lenFront, lenBack, halfWidth, color != default ? color : Colors.AOE);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneRect(WPos origin, Angle direction, float lenFront, float lenBack, float halfWidth, uint color)
-    {
-        ref var tri = ref _triCache.Get(8, origin, direction, lenFront, lenBack, halfWidth);
-        if (tri == null)
-        {
-            var offset = origin - _center;
-            tri = _bounds.Shape.PolygonDirectionalRectIntersection(offset, direction.ToDirection(), lenFront, lenBack, halfWidth) switch
-            {
-                PolygonShapeRelation.Inside => _bounds.TriangulateRect(offset, direction, lenFront, lenBack, halfWidth),
-                PolygonShapeRelation.Outside => [],
-                _ => _bounds.ClipAndTriangulateRect(offset, direction, lenFront, lenBack, halfWidth)
-            };
-        }
-        Zone(tri, color);
-    }
+        => Dx11ArenaRenderer.AppendRect(origin - _center, direction.ToDirection(), lenFront, lenBack, halfWidth, color != default ? color : Colors.AOE);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneRect(WPos start, WPos end, float halfWidth, uint color)
     {
-        ref var tri = ref _triCache.Get(9, start, end, halfWidth);
-        if (tri == null)
+        var dir = end - start;
+        var len = dir.Length();
+        if (len > 0f)
         {
-            var offset = start - _center;
-            var offset2 = end - _center;
-            var dir = end - start;
-            var len = dir.Length();
-            var dirNormalized = len > 0f ? dir / len : default;
-            tri = _bounds.Shape.PolygonRectIntersection(offset, dirNormalized, halfWidth, len) switch
-            {
-                PolygonShapeRelation.Inside => _bounds.TriangulateRect(offset, offset2, halfWidth),
-                PolygonShapeRelation.Outside => [],
-                _ => _bounds.ClipAndTriangulateRect(offset, offset2, halfWidth)
-            };
+            Dx11ArenaRenderer.AppendRect(start - _center, dir / len, len, 0f, halfWidth, color != default ? color : Colors.AOE);
         }
-        Zone(tri, color);
     }
 
-    public void ZoneCross(WPos origin, Angle rotation, float range, float halfWidth, WPos[] contour, uint color)
-    {
-        ref var tri = ref _triCache.Get(10, origin, rotation, range, halfWidth);
-        if (tri == null)
-        {
-            var len = contour.Length;
-            var adjusted = new WDir[len];
-            for (var i = 0; i < len; i++)
-            {
-                adjusted[i] = contour[i] - _center;
-            }
-            tri = _bounds.ClipAndTriangulate(adjusted);
-        }
-        Zone(tri, color);
-    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void ZoneCross(WPos origin, Angle rotation, float range, float halfWidth, uint color)
+        => Dx11ArenaRenderer.AppendCross(origin - _center, rotation.ToDirection(), range, halfWidth, color != default ? color : Colors.AOE);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneRelPoly(RelSimplifiedComplexPolygon poly, uint color)
-    {
-        ref var tri = ref _triCache.Get(11, poly);
-        tri ??= _bounds.ClipAndTriangulate(poly);
-        Zone(tri, color);
-    }
+        => Dx11ArenaRenderer.AppendRelPoly(poly, color != default ? color : Colors.AOE);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneCapsule(WPos start, WDir direction, float radius, float length, uint color)
-    {
-        ref var tri = ref _triCache.Get(12, start, direction, radius, length);
-        if (tri == null)
-        {
-            var offset = start - _center;
-            tri = _bounds.Shape.PolygonCapsuleIntersection(offset, direction, radius, length) switch
-            {
-                PolygonShapeRelation.Inside => _bounds.TriangulateCapsule(offset, direction, radius, length),
-                PolygonShapeRelation.Outside => [],
-                _ => _bounds.ClipAndTriangulateCapsule(offset, direction, radius, length)
-            };
-        }
-        Zone(tri, color);
-    }
+        => Dx11ArenaRenderer.AppendCapsule(start - _center, direction, radius, length, color != default ? color : Colors.AOE);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneArcCapsule(WPos start, WPos orbitCenter, Angle angularLength, float radius, uint color)
+        => Dx11ArenaRenderer.AppendArcCapsule(start - _center, orbitCenter - start, angularLength.Rad, radius, color != default ? color : Colors.AOE);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void PrepareOutlineStyle(uint color, float thickness, out uint lineColor, out float lineThickness, out uint shadowColor, out float shadowThickness)
     {
-        ref var tri = ref _triCache.Get(13, start, orbitCenter, angularLength, radius);
-        // startOffset: local translation; toOrbitCenter: vector from start to orbit center
-        var startOffset = start - _center;
-        var toOrbitCenter = orbitCenter - start;
-        tri ??= _bounds.ClipAndTriangulateArcCapsule(startOffset, toOrbitCenter, angularLength, radius);
-        Zone(tri, color);
+        lineColor = color != default ? color : Colors.Danger;
+        lineThickness = thickness * _frameThicknessScale;
+        if (_frameShowOutlinesAndShadows)
+        {
+            shadowColor = Colors.Shadows;
+            shadowThickness = (thickness + 1f) * _frameThicknessScale;
+        }
+        else
+        {
+            shadowColor = 0u;
+            shadowThickness = lineThickness;
+        }
     }
 
-    // draw zone outlines - these are filled primitives clipped to arena border; note that clipped polygons are cached
+    // draw zone outlines
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneConeOutline(WPos center, float innerRadius, float outerRadius, Angle centerDirection, Angle halfAngle, uint color = default, float thickness = 1f)
     {
-        ref var poly = ref _polyCache.Get(1, center, innerRadius, outerRadius, centerDirection, halfAngle);
-        poly ??= _bounds.ClipCone(center - _center, innerRadius, outerRadius, centerDirection, halfAngle);
-        AddComplexPolygon(poly, color, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendConeOutline(center - _center, innerRadius, outerRadius, centerDirection.ToDirection(), halfAngle.Rad, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneCircleOutline(WPos center, float radius, uint color = default, float thickness = 1f)
     {
-        ref var poly = ref _polyCache.Get(2, center, radius);
-        if (poly == null)
-        {
-            var offset = center - _center;
-            poly = _bounds.Shape.PolygonCircleIntersection(offset, radius) switch
-            {
-                PolygonShapeRelation.Inside => _bounds.CirclePolygon(offset, radius),
-                PolygonShapeRelation.Outside => new(),
-                _ => _bounds.ClipCircle(offset, radius)
-            };
-        }
-        AddComplexPolygon(poly, color, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendCircleOutline(center - _center, radius, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
-    public void ZoneCircleOutlineUnclipped(WPos center, float radius, uint color = default, float thickness = 1f)
-    {
-        ref var poly = ref _polyCache.Get(14, center, radius);
-        poly ??= _bounds.CirclePolygon(center - _center, radius);
-        AddComplexPolygon(poly, color, thickness);
-    }
-
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneDonutOutline(WPos center, float innerRadius, float outerRadius, uint color = default, float thickness = 1f)
     {
-        ref var poly = ref _polyCache.Get(3, center, innerRadius, outerRadius);
-        if (poly == null)
-        {
-            var offset = center - _center;
-
-            poly = _bounds.Shape.PolygonDonutIntersection(offset, innerRadius, outerRadius) switch
-            {
-                PolygonShapeRelation.Inside => _bounds.DonutPolygon(offset, innerRadius, outerRadius),
-                PolygonShapeRelation.Outside => new(),
-                _ => _bounds.ClipDonut(offset, innerRadius, outerRadius),
-            };
-        }
-        AddComplexPolygon(poly, color, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendDonutOutline(center - _center, innerRadius, outerRadius, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneTriOutline(WPos a, WPos b, WPos c, uint color = default, float thickness = 1f)
     {
-        ref var poly = ref _polyCache.Get(4, a, b, c);
-        poly ??= _bounds.ClipTri(a - _center, b - _center, c - _center);
-        AddComplexPolygon(poly, color, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendTriangleOutline(a - _center, b - _center, c - _center, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneIsoscelesTriOutline(WPos apex, WDir height, WDir halfBase, uint color = default, float thickness = 1f)
     {
-        ref var poly = ref _polyCache.Get(5, apex, height, halfBase);
-        poly ??= _bounds.ClipIsoscelesTri(apex - _center, height, halfBase);
-        AddComplexPolygon(poly, color, thickness);
+        var a = apex - _center;
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendTriangleOutline(a, a + height + halfBase, a + height - halfBase, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneRectOutline(WPos origin, WDir direction, float lenFront, float lenBack, float halfWidth, uint color = default, float thickness = 1f)
     {
-        ref var poly = ref _polyCache.Get(7, origin, direction, lenFront, lenBack, halfWidth);
-        if (poly == null)
-        {
-            var offset = origin - _center;
-            poly = _bounds.Shape.PolygonDirectionalRectIntersection(offset, direction, lenFront, lenBack, halfWidth) switch
-            {
-                PolygonShapeRelation.Inside => _bounds.ClipRect(offset, direction, lenFront, lenBack, halfWidth),
-                PolygonShapeRelation.Outside => new(),
-                _ => _bounds.ClipRect(offset, direction, lenFront, lenBack, halfWidth)
-            };
-        }
-        AddComplexPolygon(poly, color, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendRectOutline(origin - _center, direction, lenFront, lenBack, halfWidth, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneRectOutline(WPos origin, Angle direction, float lenFront, float lenBack, float halfWidth, uint color = default, float thickness = 1f)
     {
-        ref var poly = ref _polyCache.Get(8, origin, direction, lenFront, lenBack, halfWidth);
-        if (poly == null)
-        {
-            var offset = origin - _center;
-            var dir = direction.ToDirection();
-            poly = _bounds.Shape.PolygonDirectionalRectIntersection(offset, dir, lenFront, lenBack, halfWidth) switch
-            {
-                PolygonShapeRelation.Inside => _bounds.ClipRect(offset, dir, lenFront, lenBack, halfWidth),
-                PolygonShapeRelation.Outside => new(),
-                _ => _bounds.ClipRect(offset, dir, lenFront, lenBack, halfWidth)
-            };
-        }
-        AddComplexPolygon(poly, color, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendRectOutline(origin - _center, direction.ToDirection(), lenFront, lenBack, halfWidth, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneRectOutline(WPos start, WPos end, float halfWidth, uint color = default, float thickness = 1f)
     {
-        ref var poly = ref _polyCache.Get(9, start, end, halfWidth);
-        if (poly == null)
+        var dir = end - start;
+        var len = dir.Length();
+        if (!(len > 0f))
         {
-            var offset = start - _center;
-            var offset2 = end - _center;
-            var dir = end - start;
-            var len = dir.Length();
-            var dirNormalized = len > 0f ? dir / len : default;
-            poly = _bounds.Shape.PolygonRectIntersection(offset, dirNormalized, halfWidth, len) switch
-            {
-                PolygonShapeRelation.Inside => _bounds.RectPolygon(offset, offset2, halfWidth),
-                PolygonShapeRelation.Outside => new(),
-                _ => _bounds.ClipRect(offset, offset2, halfWidth)
-            };
+            return;
         }
-        AddComplexPolygon(poly, color, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendRectOutline(start - _center, dir / len, len, 0f, halfWidth, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
-    public void ZoneCrossOutline(WPos origin, Angle rotation, float range, float halfWidth, WPos[] contour, uint color = default, float thickness = 1f)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void ZoneCrossOutline(WPos origin, Angle rotation, float range, float halfWidth, uint color = default, float thickness = 1f)
     {
-        ref var poly = ref _polyCache.Get(10, origin, rotation, range, halfWidth);
-        if (poly == null)
-        {
-            var len = contour.Length;
-            var adjusted = new WDir[len];
-            for (var i = 0; i < len; i++)
-            {
-                adjusted[i] = contour[i] - _center;
-            }
-            poly = _bounds.Clip(adjusted);
-        }
-        AddComplexPolygon(poly, color, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendCrossOutline(origin - _center, rotation.ToDirection(), range, halfWidth, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneRelPolyOutline(RelSimplifiedComplexPolygon poly, uint color = default, float thickness = 1f)
     {
-        ref var polygon = ref _polyCache.Get(11, poly);
-        polygon ??= _bounds.Clip(poly);
-        AddComplexPolygon(polygon, color, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendCustomOutline(poly, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneCapsuleOutline(WPos start, WDir direction, float radius, float length, uint color = default, float thickness = 1f)
     {
-        ref var poly = ref _polyCache.Get(12, start, direction, radius, length);
-        poly ??= _bounds.ClipCapsule(start - _center, direction, radius, length);
-        AddComplexPolygon(poly, color, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendCapsuleOutline(start - _center, direction, radius, length, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ZoneArcCapsuleOutline(WPos start, WPos orbitCenter, Angle angularLength, float radius, uint color = default, float thickness = 1f)
     {
-        ref var poly = ref _polyCache.Get(13, start, orbitCenter, angularLength, radius);
-        // startOffset: local translation; toOrbitCenter: vector from start to orbit center
-        var startOffset = start - _center;
-        var toOrbitCenter = orbitCenter - start;
-        poly ??= _bounds.ClipArcCapsule(startOffset, toOrbitCenter, angularLength, radius);
-        AddComplexPolygon(poly, color, thickness);
+        PrepareOutlineStyle(color, thickness, out var lineColor, out var lineThickness, out var shadowColor, out var shadowThickness);
+        Dx11ArenaRenderer.AppendArcCapsuleOutline(start - _center, orbitCenter - start, angularLength.Rad, radius, lineColor, lineThickness, shadowColor, shadowThickness);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void TextScreen(Vector2 center, string text, uint color, float fontSize = 17f)
+    public void SpriteScreen(Vector2 min, Vector2 max, IDalamudTextureWrap texture, uint color = 0xFFFFFFFFu)
+        => Dx11ArenaRenderer.AppendSpriteScreen(min, max, texture, color);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void TextScreen(Vector2 center, string text, uint color, float fontSize = 17f, uint outlineColor = 0u, float outlineWidth = 0f)
+        => Dx11ArenaRenderer.AppendTextScreen(center, text, fontSize * _frameArenaScale, color, outlineColor, outlineWidth * _frameArenaScale);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void TextWorld(WPos center, string text, uint color, float fontSize = 17f, uint outlineColor = 0u, float outlineWidth = 0f)
+        => TextScreen(WorldPositionToScreenPosition(center), text, color, fontSize, outlineColor, outlineWidth);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void IconScreen(Vector2 center, FontAwesomeIcon icon, uint color, float fontSize = 17f)
     {
-        var size = ImGui.CalcTextSize(text) * Config.ArenaScale;
-        ImGui.GetWindowDrawList().AddText(ImGui.GetFont(), fontSize * Config.ArenaScale, center - size * 0.5f, color, text);
+        var text = icon.ToIconString();
+        Dx11ArenaRenderer.AppendIconScreen(center, text, fontSize, color);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void TextWorld(WPos center, string text, uint color, float fontSize = 17f) => TextScreen(WorldPositionToScreenPosition(center), text, color, fontSize);
-
-    public void IconScreen(Vector2 center, FontAwesomeIcon icon, uint color, float fontSize = 17)
-    {
-        var size = ImGui.CalcTextSizeA(Service.IconFont, fontSize, float.MaxValue, float.MaxValue, icon.ToIconString(), out var i);
-        size.X -= i * 0.5f;
-        ImGui.GetWindowDrawList().AddText(Service.IconFont, fontSize, center - size / 2, color, icon.ToIconString());
-    }
-
-    public void IconWorld(WPos center, FontAwesomeIcon icon, uint color, float fontSize = 17) => IconScreen(WorldPositionToScreenPosition(center), icon, color, fontSize);
+    public void IconWorld(WPos center, FontAwesomeIcon icon, uint color, float fontSize = 17f) => IconScreen(WorldPositionToScreenPosition(center), icon, color, fontSize);
 
     public void CardinalNames()
     {
         var center = ScreenCenter;
-        var fontSetting = Config.CardinalsFontSize;
-        var offCenterSizeOffset = (ScreenHalfSize + ScreenMarginSize * 0.5f) * _bounds.ScaleFactor + fontSetting - 17f;
+        var fontSetting = _frameCardinalsFontSize;
+        var offCenterSizeOffset = (_frameScreenHalfSize + _frameScreenMarginSize * 0.5f) * _bounds.ScaleFactor + fontSetting - 17f;
         var offS = RotatedCoords(new(default, offCenterSizeOffset));
         var offE = RotatedCoords(new(offCenterSizeOffset, default));
         TextScreen(center - offS, "N", Colors.CardinalN, fontSetting);
         TextScreen(center + offS, "S", Colors.CardinalS, fontSetting);
         TextScreen(center + offE, "E", Colors.CardinalE, fontSetting);
-        TextScreen(center - offE, "W", Colors.CardinalW, fontSetting);
+        TextScreen(center - offE * 1.02f, "W", Colors.CardinalW, fontSetting); // w is slightly wider, so we are putting it 2% farther away than the E
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ActorInsideBounds(WPos position, Angle rotation, uint color)
     {
-        var scale = Config.ActorScale * Config.ThicknessScale;
+        var scale = _frameActorScale * _frameThicknessScale;
         var dir = rotation.ToDirection();
         var scale07 = scale * 0.7f * dir;
         var scale035 = scale * 0.35f * dir;
@@ -627,7 +460,7 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
         var positionscale035 = position - scale035;
         var positionscale035pscale0433 = positionscale035 + scale0433;
         var positionscale035mscale0433 = positionscale035 - scale0433;
-        if (Config.ShowOutlinesAndShadows)
+        if (_frameShowOutlinesAndShadows)
         {
             AddTriangle(positionscale07, positionscale035pscale0433, positionscale035mscale0433, Colors.Shadows, 2f);
         }
@@ -635,9 +468,10 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
         AddTriangleFilled(positionscale07, positionscale035pscale0433, positionscale035mscale0433, color);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ActorOutsideBounds(WPos position, Angle rotation, uint color)
     {
-        var scale = Config.ActorScale;
+        var scale = _frameActorScale;
         var dir = rotation.ToDirection();
         var scale07 = scale * 0.7f * dir;
         var scale035 = scale * 0.35f * dir;
@@ -646,6 +480,7 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
         AddTriangle(position + scale07, positionscale035 + scale0433, positionscale035 - scale0433, color);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ActorProjected(WPos from, WPos to, Angle rotation, uint color)
     {
         if (InBounds(to))
@@ -671,6 +506,7 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Actor(WPos position, Angle rotation, uint color)
     {
         if (InBounds(position))
@@ -683,6 +519,7 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Actor(Actor? actor, uint color = default, bool allowDeadAndUntargetable = false)
     {
         if (actor != null && !actor.IsDestroyed && (allowDeadAndUntargetable || actor.IsTargetable && !actor.IsDead))
@@ -691,6 +528,7 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Actors(IEnumerable<Actor> actors, uint color = default, bool allowDeadAndUntargetable = false)
     {
         foreach (var a in actors)
@@ -699,6 +537,7 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Actors(List<Actor> actors, uint color = default, bool allowDeadAndUntargetable = false)
     {
         var count = actors.Count;
@@ -750,5 +589,10 @@ public sealed class MiniArena(WPos center, ArenaBounds bounds)
         }
     }
 
-    public static void End() => ImGui.GetWindowDrawList().PopClipRect();
+    public static void End()
+    {
+        // Flush the final contiguous run while the arena clip rect is still active
+        Dx11ArenaRenderer.EndArena();
+        ImGui.GetWindowDrawList().PopClipRect();
+    }
 }
