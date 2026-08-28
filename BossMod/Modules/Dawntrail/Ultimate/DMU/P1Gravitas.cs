@@ -1,7 +1,6 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-// TODO think of a way to move spreads a bit further in for range? - First one is fine, but second one has a half cleave which could be dangerous
-sealed class Gravitas(BossModule module) : Components.UniformStackSpread(module, 5, 5, 4, 4) {
+sealed class Gravitas(BossModule module) : Components.UniformStackSpread(module, 5, 5, 4, 8) {
     private readonly WPos stackSource = new WPos(102.500f, 22.500f);
     private readonly WPos spreadSource = new WPos(126.000f, 41.500f);
     private readonly List<Spread> spreadsIncoming = [];
@@ -10,6 +9,8 @@ sealed class Gravitas(BossModule module) : Components.UniformStackSpread(module,
     private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
     private readonly BlizzardIIIBlowout? blizzardIIIBlowout = module.FindComponent<BlizzardIIIBlowout>();
+    private readonly GravitationalWave? gravitationalWave = module.FindComponent<GravitationalWave>();
+    private WPos? cachedSafeSpot = null;
 
     public override void OnTethered(Actor source, in ActorTetherInfo tether) {
         if (tether.ID != (uint)TetherID.GravenImageTether || Raid.FindSlot(tether.Target) is var slot && slot < 0) {
@@ -63,17 +64,9 @@ sealed class Gravitas(BossModule module) : Components.UniformStackSpread(module,
         var assignment = partyConfig[Raid.Members[pcSlot].ContentId];
 
         if (Stacks.Count != 0) {
-            var safeSpot = P1GravitasData.PuddlesSpots.GetValueOrDefault(side);
+            var safeSpot = getStackSafeSpot();
             if (safeSpot == default) {
                 return;
-            }
-
-            // If a blizzard blowout is being cast, we move the safeSpot 0.5f away from the aoe zone
-            if (blizzardIIIBlowout != null) {
-                foreach (var caster in blizzardIIIBlowout.Casters) {
-                    var tempSafeSpot = safeSpot + new WDir(-0.5f, 0);
-                    safeSpot = caster.Check(tempSafeSpot) ? safeSpot + new WDir(0.5f, 0) : tempSafeSpot;
-                }
             }
 
             Arena.ZoneCircleOutline(safeSpot, PositionDrawSize.NORMAL, Colors.Safe, 2.0f);
@@ -115,17 +108,9 @@ sealed class Gravitas(BossModule module) : Components.UniformStackSpread(module,
 
         // Position for stack
         if (Stacks.Count != 0) {
-            var safeSpot = P1GravitasData.PuddlesSpots.GetValueOrDefault(side);
+            var safeSpot = getStackSafeSpot();
             if (safeSpot == default) {
                 return;
-            }
-
-            // If a blizzard blowout is being cast, we move the safeSpot 0.5f away from the aoe zone
-            if (blizzardIIIBlowout != null) {
-                foreach (var caster in blizzardIIIBlowout.Casters) {
-                    var tempSafeSpot = safeSpot + new WDir(-0.5f, 0);
-                    safeSpot = caster.Check(tempSafeSpot) ? safeSpot + new WDir(0.5f, 0) : tempSafeSpot;
-                }
             }
 
             hints.AddForbiddenZone(new SDInvertedCircle(safeSpot, PositionAIRadius.PRECISE), Stacks[0].Activation);
@@ -169,14 +154,50 @@ sealed class Gravitas(BossModule module) : Components.UniformStackSpread(module,
         }
 
         // Players without a spread stand directly middle under boss
-        hints.GoalZones.Add(AIHints.GoalProximity(Module.Center, PositionAIRadius.PRECISE, PositionWeights.MECHANIC));
+        if (remaining <= 1.0f) {
+            hints.GoalZones.Add(AIHints.GoalProximity(Module.Center, PositionAIRadius.PRECISE, PositionWeights.MECHANIC));
+            return;
+        }
+
+        hints.AddForbiddenZone(new SDInvertedCircle(Module.Center, PositionAIRadius.PRECISE), Spreads[0].Activation);
+    }
+
+    private WPos getStackSafeSpot() {
+        var safeSpot = P1GravitasData.PuddlesSpots.GetValueOrDefault(side);
+        if (safeSpot == default) {
+            return default;
+        }
+
+        // If a blizzard blowout is being cast, we move the safeSpot 0.5f away from the aoe zone
+        // The safespot will be cached instead of moving back to the original position after BlizzardBlowOut has finished - typically what players actually do
+        if (blizzardIIIBlowout != null) {
+            foreach (var caster in blizzardIIIBlowout.Casters) {
+
+                // Check the cast is happening north
+                if (!caster.Check(new WPos(89.000f, 89.000f)) && !caster.Check(new WPos(111.000f, 89.000f))) {
+                    continue;
+                }
+
+                var tempSafeSpot = safeSpot + new WDir(-0.5f, 0);
+                cachedSafeSpot = caster.Check(tempSafeSpot) ? safeSpot + new WDir(0.5f, 0) : tempSafeSpot;
+            }
+        }
+
+        // The safespot will not move back to the orignal position after gravtiationalWave has finished, this is intended so casters don't have to re-position
+        // again potentially losing a GCD - the safeSpot is 0.5f difference so they don't need to be dead center on the position
+        if (gravitationalWave != null) {
+            foreach (var aoe in gravitationalWave.aoes) {
+                // Check which side the cast is happening
+                var tempSafeSpot = safeSpot + new WDir(-0.5f, 0);
+                cachedSafeSpot = aoe.Check(tempSafeSpot) ? safeSpot + new WDir(0.5f, 0) : tempSafeSpot;
+            }
+        }
+
+        return cachedSafeSpot ?? safeSpot;
     }
 }
 
 // Puddles are voidzones, but custom component is needed to make them disappear when they're actually soaked instead of using eventState != 7 or isDead
-// TODO
-//  1. Fix the AI logic for people without spreads when the puddles spawn - most likely in the component above
-//  2. Setup AI logic during Knockbacks - AIHints should become available after KB cast has happened for soaking - check the cast for it maybe
 sealed class GravitasPuddles(BossModule module) : BossComponent(module) {
     private readonly AOEShapeCircle shape = new(5.0f);
     private readonly List<Actor> puddles = [];
@@ -248,10 +269,45 @@ sealed class GravitasPuddles(BossModule module) : BossComponent(module) {
             return;
         }
 
-        hints.AddForbiddenZone(inverted ? new SDInvertedUnion([.. shapes]) : new SDUnion([.. shapes]), WorldState.FutureTime(5.0f));
+        hints.AddForbiddenZone(inverted ? new SDInvertedUnion([.. shapes]) : new SDUnion([.. shapes]));
     }
 }
 
-// TODO enable TB and set them up correctly - might need to setup activation for TB
-//  this is so they don't walk by the puddle since it would have the same foreground weight, and they have to be different weights
-//  Potentially might be better to make it 45 degree either side of the tank now with a radius of like 10 instead of the full part of north
+sealed class GravitationalWave(BossModule module) : Components.GenericAOEs(module) {
+    private readonly AOEShapeRect shape = new(40.0f, 20.0f);
+    public readonly List<AOEInstance> aoes = [];
+    public bool Risky = false;
+
+    public override void OnActorEAnim(Actor actor, uint state) {
+        if (state == (uint)Animations.PulseOrbStart) {
+            aoes.Add(new(shape, Arena.Center.Quantized(), (actor.OID == (uint)OID.YellowOrb ? 1f : -1f) * 90.Degrees()));
+        }
+    }
+
+    public override void OnEventCast(Actor caster, ActorCastEvent spell) {
+        if (spell.Action.ID is (uint)AID.GravitationalWave or (uint)AID.IntemperateWill) {
+            if (aoes.Count > 0) {
+                NumCasts++;
+                aoes.RemoveAt(0);
+            }
+        }
+    }
+
+    public override ReadOnlySpan<AOEInstance> ActiveAOEs(int slot, Actor actor) {
+        var count = aoes.Count;
+        if (count == 0) {
+            return [];
+        }
+
+        var incomingAOEs = CollectionsMarshal.AsSpan(aoes);
+        for (var i = 0; i < count; i++) {
+            ref var aoe = ref incomingAOEs[i];
+            aoe.Risky = Risky;
+        }
+
+        return incomingAOEs;
+    }
+}
+
+// TODO setup knockback AI for puddles as the safe voidzone part should become available after knockback has gone off
+//  Setup AI logic during Knockbacks - AIHints should become available after KB cast has happened for soaking - check the cast for it maybe

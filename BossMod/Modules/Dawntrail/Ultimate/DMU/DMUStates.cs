@@ -717,30 +717,34 @@ sealed class DMUStates : StateMachineBuilder
         ComponentCondition<HyperDrive>(id + 0x120, 2.1f, static o => o.NumCasts > 2, "3rd Tankbuster")
             .DeactivateOnExit<HyperDrive>();
 
-        Cast(id + 0x130, (uint)AID.GravenImage, 7.3f, 3, "Graven Image")
+        CastStart(id + 0x130, (uint)AID.GravenImage, 7.3f, "Graven Image")
             .ActivateOnEnter<BlizzardIIIBlowout>()
-            .ActivateOnEnter<GravitasPuddles>()
             .ExecOnEnter<BlizzardIIIBlowout>(static o => o.Risky = true)
             .ActivateOnEnter<Gravitas>()
-            .ExecOnEnter<Gravitas>(static o => o.side = P1GravitasData.Side.NORTH);
-        ComponentCondition<BlizzardIIIBlowout>(id + 0x140, 7.15f, static o => o.NumCasts > 0, "Blizzard safe spots + Stack")
+            .ExecOnEnter<Gravitas>(static o => o.side = P1GravitasData.Side.NORTH)
+            .ActivateOnEnter<GravitasPuddles>();
+        ComponentCondition<BlizzardIIIBlowout>(id + 0x140, 10.1f, static o => o.NumCasts > 0, "Blizzard safe spots + Stack")
             .DeactivateOnExit<BlizzardIIIBlowout>();
         ComponentCondition<Gravitas>(id + 0x150, 4.1f, static o => !o.Active, "Spreads")
             .DeactivateOnExit<Gravitas>()
-            //.ActivateOnEnter<RevoltingRuinIIIFirst>()
-            //.ActivateOnEnter<RevoltingRuinIIISecond>()
-            .ActivateOnEnter<GravitationalWave>();
-        Cast(id + 0x160, (uint)AID.RevoltingRuinIIIFirstHit, 0.7f, 5, "1st Tankbuster");
-        ComponentCondition<RevoltingRuinIIIFirst>(id + 0x165, 3.25f, o => o.NumCasts > 1, "2nd Tankbuster");
-            //.DeactivateOnExit<RevoltingRuinIIIFirst>();
-        ComponentCondition<GravitationalWave>(id + 0x170, 0.80f, static o => o.NumCasts > 0, "Left/Right Cleave")
-            .DeactivateOnExit<GravitationalWave>()
+            .ActivateOnExit<RevoltingRuinIIIFirst>()
+            .ActivateOnExit<RevoltingRuinIIISecond>()
+            .ActivateOnExit<GravitationalWave>()
+            .ExecOnExit<GravitationalWave>(static o => o.Risky = true);
+        CastStart(id + 0x160, (uint)AID.RevoltingRuinIIIFirstHit, 0.7f);
+        ComponentCondition<RevoltingRuinIIIFirst>(id + 0x162, 5.0f, static o => o.NumCasts > 0, "1st Tankbuster Resolve")
+            .DeactivateOnExit<RevoltingRuinIIIFirst>();
+        ComponentCondition<RevoltingRuinIIISecond>(id + 0x165, 3.2f, static o => o.NumCasts > 0, "2nd Tankbuster Resolve")
+            .DeactivateOnExit<RevoltingRuinIIISecond>()
             .ActivateOnExit<Gravitas>()
             .ExecOnExit<Gravitas>(static o => o.side = P1GravitasData.Side.SOUTH);
+        ComponentCondition<GravitationalWave>(id + 0x170, 0.80f, static o => o.NumCasts > 0, "Left/Right Cleave")
+            .DeactivateOnExit<GravitationalWave>();
         ComponentCondition<Gravitas>(id + 0x180, 4.6f, static o => o.Stacks.Count == 0, "Stack");
         ComponentCondition<Gravitas>(id + 0x190, 4.0f, static o => !o.Active, "Spreads")
             .DeactivateOnExit<Gravitas>()
-            .ActivateOnEnter<GravitationalWave>();
+            .ActivateOnEnter<GravitationalWave>()
+            .ExecOnExit<GravitationalWave>(static o => o.Risky = true);
         ComponentCondition<GravitationalWave>(id + 0x200, 4.5f, static o => o.NumCasts > 0, "Left/Right Cleave")
             .DeactivateOnExit<GravitationalWave>()
             .ActivateOnEnter<DoubleTroubleTrapKnockback>()

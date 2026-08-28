@@ -1,30 +1,5 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-sealed class GravitationalWave(BossModule module) : Components.GenericAOEs(module)
-{
-    private AOEInstance[] _aoe = [];
-    private readonly AOEShapeRect rect = new(40f, 20f);
-
-    public override void OnActorEAnim(Actor actor, uint state)
-    {
-        if (state == (uint)Animations.PulseOrbStart)
-        {
-            _aoe = [new(rect, Arena.Center.Quantized(), (actor.OID == (uint)OID.YellowOrb ? 1f : -1f) * 90.Degrees())];
-        }
-    }
-
-    public override void OnEventCast(Actor caster, ActorCastEvent spell)
-    {
-        if (spell.Action.ID is ((uint)AID.GravitationalWave) or ((uint)AID.IntemperateWill))
-        {
-            ++NumCasts;
-            _aoe = [];
-        }
-    }
-
-    public override ReadOnlySpan<AOEInstance> ActiveAOEs(int slot, Actor actor) => _aoe;
-}
-
 sealed class TeleTrouncing(BossModule module) : BossComponent(module)
 {
     public int NumCasts = 0;

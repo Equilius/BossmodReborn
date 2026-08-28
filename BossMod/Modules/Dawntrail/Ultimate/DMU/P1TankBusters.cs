@@ -1,5 +1,8 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
+// TODO consider redoing the AIHints for these components might be easier to give players goal zones instead of forbidden zones
+//  but can turn it into a forbidden zone later on once we know the bait timer, this way we dont have to block a ton of the map off for non tank roles
+
 static class NorthAIHints {
     private const float maxMelee = 2.5f;
 
@@ -26,7 +29,9 @@ sealed class RevoltingRuinIIIFirst(BossModule module) : Components.BaitAwayIcon(
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
-        base.AddAIHints(slot, actor, assignment, hints);
+        if (CurrentBaits.Count != 0) {
+            base.AddAIHints(slot, actor, assignment, hints);
+        }
 
         if (!dmuConfig.P1RevoltingRuinIIIAlwaysAroundTrueNorth) {
             return;
@@ -51,7 +56,16 @@ sealed class RevoltingRuinIIIFirst(BossModule module) : Components.BaitAwayIcon(
         }
 
         // Movement for everyone else (including the tank who is not taking the tank buster)
-        hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 20.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()));
+        if (CurrentBaits.Count > 0) {
+            hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 20.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()),
+                CurrentBaits[0].Activation);
+            return;
+        }
+
+        // TODO refer to comment at the top of the class
+        // This forbidden zone is always 2.0f so the pathfinder can see other current aoes that are active to avoid walking into them such as puddles
+        hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 20.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()),
+            WorldState.FutureTime(2.0f));
     }
 }
 
