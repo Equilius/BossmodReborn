@@ -159,7 +159,9 @@ public sealed class AIHints
     // maximal time we can spend casting before we need to move
     // this is used by the action queue to skip casts that we won't be able to finish and execute lower-priority fallback actions instead
     public float MaxCastTime = float.MaxValue;
-    public bool ForceCancelCast;
+    public bool ForceCancelCastOther;
+
+    public bool ForceCancelCastMechanic;
 
     // actions that we want to be executed, gathered from various sources (manual input, autorotation, planner, ai, modules, etc.)
     public readonly ActionQueue ActionsToExecute = new();
@@ -197,7 +199,8 @@ public sealed class AIHints
         PredictedDamage.Clear();
         ShouldCleanse.Reset();
         MaxCastTime = float.MaxValue;
-        ForceCancelCast = false;
+        ForceCancelCastOther = false;
+        ForceCancelCastMechanic = false;
         ActionsToExecute.Clear();
         StatusesToCancel.Clear();
         WantJump = false;
@@ -449,7 +452,7 @@ public sealed class AIHints
     public static Func<WPos, float> GoalSingleTarget(Actor target, float range, float weight = 1f) => GoalSingleTarget(target.Position, range + target.HitboxRadius, weight);
 
     // simple goal zone that returns 1 if target is in range (usually melee), 2 if it's also in correct positional
-    public static Func<WPos, float> GoalSingleTarget(WPos target, Angle rotation, Positional positional, float radius)
+    public static Func<WPos, float> GoalSingleTarget(WPos target, Angle rotation, Positional positional, float radius, float cushion = 0f)
     {
         if (positional == Positional.Any)
         {
@@ -458,28 +461,30 @@ public sealed class AIHints
 
         var effRsq = radius * radius;
         var targetDir = rotation.ToDirection();
+        const float sqrt2 = 1.41421356f;
+        var cushionThreshold = cushion * sqrt2;
         return p =>
         {
             var offset = p - target;
             var lsq = offset.LengthSq();
             if (lsq > effRsq)
             {
-                return 0; // out of range
+                return 0f; // out of range
             }
             // note: this assumes that extra dot is cheaper than sqrt?..
             var front = targetDir.Dot(offset);
             var side = Math.Abs(targetDir.Dot(offset.OrthoL()));
             var inPositional = positional switch
             {
-                Positional.Flank => side > Math.Abs(front),
-                Positional.Rear => -front > side,
-                Positional.Front => front > side, // TODO: reconsider this, it's not a real positional?..
+                Positional.Flank => side - Math.Abs(front) > cushionThreshold,
+                Positional.Rear => -front - side > cushionThreshold,
+                Positional.Front => front - side > cushionThreshold, // TODO: reconsider this, it's not a real positional?..
                 _ => false
             };
             return inPositional ? 2f : 1f;
         };
     }
-    public static Func<WPos, float> GoalSingleTarget(Actor target, Positional positional, float range = 2.6f) => GoalSingleTarget(target.Position, target.Rotation, positional, range + target.HitboxRadius);
+    public static Func<WPos, float> GoalSingleTarget(Actor target, Positional positional, float range = 2.6f, float cushion = 0f) => GoalSingleTarget(target.Position, target.Rotation, positional, range + target.HitboxRadius, cushion);
 
     // simple goal zone that returns number of targets in aoes; note that performance is a concern for these functions, and perfection isn't required, so eg they ignore forbidden targets, etc
     public Func<WPos, float> GoalAOECircle(float radius)
@@ -598,11 +603,15 @@ public sealed class AIHints
     // goal zone that returns a value between 0 and weight depending on distance to point; useful for downtime movement targets
     public static Func<WPos, float> GoalProximity(WPos destination, float maxDistance, float maxWeight)
     {
-        var invDist = 1f / maxDistance;
+        var maxDistSq = maxDistance * maxDistance;
+        var invDistSq = 1f / maxDistSq;
+
         return p =>
         {
-            var dist = (p - destination).Length();
-            var weight = 1f - Math.Clamp(invDist * dist, default, 1f);
+            var delta = p - destination;
+            var distSq = delta.LengthSq();
+
+            var weight = 1f - Math.Clamp(invDistSq * distSq, 0f, 1f);
             return maxWeight * weight;
         };
     }

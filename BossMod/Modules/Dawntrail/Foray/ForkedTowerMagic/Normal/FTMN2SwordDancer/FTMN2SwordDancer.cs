@@ -41,7 +41,9 @@ sealed class MartialMystique(BossModule module) : Components.SimpleAOEs(module, 
 sealed class Pierce(BossModule module) : Components.SimpleAOEs(module, (uint)AID.Pierce, 5f);
 sealed class Cyclosword(BossModule module) : Components.GenericAOEs(module)
 {
+    // model state change doesn't trigger each time; if actor does the same AOE later, doesn't happen
     private readonly List<AOEInstance> _aoes = [];
+    private readonly Dictionary<ulong, AOEShape> _cycloswords = [];
     public override ReadOnlySpan<AOEInstance> ActiveAOEs(int slot, Actor actor)
     {
         return CollectionsMarshal.AsSpan(_aoes);
@@ -54,6 +56,7 @@ sealed class Cyclosword(BossModule module) : Components.GenericAOEs(module)
             AOEShape? shape = modelState switch
             {
                 4 => new AOEShapeDonut(15f, 60f),
+                5 => new AOEShapeDonut(20f, 60f),
                 7 => new AOEShapeCircle(15f),
                 31 => new AOEShapeCircle(20f),
                 _ => null
@@ -64,7 +67,18 @@ sealed class Cyclosword(BossModule module) : Components.GenericAOEs(module)
                 return;
             }
 
-            _aoes.Add(new(shape, actor.Position, activation: WorldState.FutureTime(13.3d)));
+            _cycloswords[actor.InstanceID] = shape;
+        }
+    }
+
+    public override void OnStatusGain(Actor actor, ref ActorStatus status)
+    {
+        if (status.ID == (uint)SID.Cyclosword)
+        {
+            if (_cycloswords.TryGetValue(actor.InstanceID, out var shape))
+            {
+                _aoes.Add(new(shape, actor.Position, default, WorldState.CurrentTime.AddSeconds(8.2d)));
+            }
         }
     }
 
@@ -77,6 +91,7 @@ sealed class Cyclosword(BossModule module) : Components.GenericAOEs(module)
                 case (uint)AID.Spin:
                 case (uint)AID.Spin1:
                 case (uint)AID.Spin2:
+                case (uint)AID.Spin3:
                     _aoes.RemoveAt(0);
                     break;
             }
@@ -123,7 +138,8 @@ sealed class SwordDance(BossModule module) : Components.GenericAOEs(module)
 sealed class Steelsbreath(BossModule module) : Components.GenericKnockback(module)
 {
     // do we need to avoid getting knocked back into RushSurgesword?
-    // only show 1 knockback; showing all 4 is visually confusing
+    // only subset; showing all 4 is visually confusing
+    // players can be hit by either Helper->SteelsBreath(50359) or DancingSword->SteelsBreath1(49599), happens at same timestamp
     private readonly List<Knockback> _knockbacks = [];
     public override ReadOnlySpan<Knockback> ActiveKnockbacks(int slot, Actor actor)
     {
@@ -132,6 +148,7 @@ sealed class Steelsbreath(BossModule module) : Components.GenericKnockback(modul
             return [];
 
         var kbs = CollectionsMarshal.AsSpan(_knockbacks);
+        //var max = count > 2 ? 2 : count;
         return kbs[..1];
     }
 
@@ -141,7 +158,7 @@ sealed class Steelsbreath(BossModule module) : Components.GenericKnockback(modul
         {
             // 10.7s between 1st status and resolve, status 1.4s between each, resolve 2.5s between each
             var count = _knockbacks.Count;
-            var act = WorldState.FutureTime(10.7d + 1.3d * count);
+            var act = WorldState.FutureTime(10.7d + 1.1d * count);
             _knockbacks.Add(new(actor.Position, 24f, act));
         }
         base.OnStatusGain(actor, ref status);
@@ -151,19 +168,48 @@ sealed class Steelsbreath(BossModule module) : Components.GenericKnockback(modul
     {
         if (_knockbacks.Count != 0 && spell.Action.ID == (uint)AID.Steelsbreath)
         {
+            ++NumCasts;
             _knockbacks.RemoveAt(0);
         }
     }
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints)
     {
+        // ActorState knockback: annoying case where Direction = 6 (AwayFromSource2) and knockback not removed before 3s expiration time
+        // 3s too long, AI will eat the next knockback into deathwall
+        // replace existing pendingeffect with new one, same values except shorter expiration so AI will move
+        // do replacement outside knockback count check, otherwise AI eats criss cross swords
+        var pendingkbs = actor.PendingKnockbacks;
+        var pcount = pendingkbs.Count;
+        if (pcount != 0)
+        {
+            var pkbs = CollectionsMarshal.AsSpan(pendingkbs);
+            for (var i = 0; i < pcount; i++)
+            {
+                ref var pkb = ref pkbs[i];
+                var timeleft = (pkb.Expiration - WorldState.CurrentTime).TotalSeconds;
+                if (timeleft >= 2.5d)
+                {
+                    var source = WorldState.Actors.Find(pkb.SourceInstanceID);
+                    if (source?.OID is (uint)OID.Helper or (uint)OID.DancingSwordSteelsbreath)
+                    {
+                        var newkb = new PendingEffect(pkb.GlobalSequence, pkb.TargetIndex, pkb.SourceInstanceID, WorldState.FutureTime(1d), true);
+                        pendingkbs.Add(newkb);
+                        pendingkbs.RemoveAt(i);
+                        break;
+                    }
+                }
+            }
+        }
+
         var kbs = CollectionsMarshal.AsSpan(_knockbacks);
         var count = kbs.Length;
         if (count != 0)
         {
             ref var kb = ref kbs[0];
             var act = kb.Activation;
-            if (!IsImmune(slot, act))
+            var isImmune = IsImmune(slot, act);
+            if (!isImmune)
             {
                 if (count == 1)
                 {

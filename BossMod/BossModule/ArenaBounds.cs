@@ -1,4 +1,6 @@
-﻿// using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 
 namespace BossMod;
 
@@ -16,11 +18,8 @@ public abstract class ArenaBounds(float radius, float mapResolution, float scale
     public readonly bool AllowObstacleMap = allowObstacleMap;
 
     // fields below are used for clipping & drawing borders
-    public readonly PolygonClipper Clipper = new();
     public float MaxApproxError;
-    public RelSimplifiedComplexPolygon Shape = new();
-    public RelTriangle[] ShapeTriangulation = [];
-    private readonly PolygonClipper.Operand _clipOperand = new();
+    public RelSimplifiedComplexPolygon Shape;
 
     public float ScreenHalfSize
     {
@@ -31,13 +30,7 @@ public abstract class ArenaBounds(float radius, float mapResolution, float scale
             {
                 field = value;
                 MaxApproxError = CurveApprox.ScreenError / value * Radius;
-                if (ShapeTriangulation.Length == 0)
-                {
-                    Shape = BuildClipPoly();
-                    ShapeTriangulation = Shape.Triangulate();
-                    _clipOperand.Clear();
-                    _clipOperand.AddPolygon(Shape); // note: shape gets simplified in ArenaBoundsCustom, other shapes don't need simplifying
-                }
+                Shape ??= BuildClipPoly();
             }
         }
     }
@@ -47,224 +40,6 @@ public abstract class ArenaBounds(float radius, float mapResolution, float scale
     public abstract bool Contains(in WDir offset);
     public abstract float IntersectRay(in WDir originOffset, in WDir dir);
     public abstract WDir ClampToBounds(in WDir offset);
-
-    // functions for clipping various shapes to bounds; all shapes are expected to be defined relative to bounds center
-    public RelTriangle[] ClipAndTriangulate(ReadOnlySpan<WDir> poly) => Clipper.Intersect(new PolygonClipper.Operand(poly), _clipOperand).Triangulate();
-    public RelTriangle[] ClipAndTriangulate(RelSimplifiedComplexPolygon poly) => Clipper.Intersect(new(poly), _clipOperand).Triangulate();
-    public RelTriangle[] Triangulate(RelSimplifiedComplexPolygon poly) => poly.Triangulate();
-    public RelSimplifiedComplexPolygon Clip(ReadOnlySpan<WDir> poly) => Clipper.Intersect(new PolygonClipper.Operand(poly), _clipOperand);
-    public RelSimplifiedComplexPolygon Clip(RelSimplifiedComplexPolygon poly) => Clipper.Intersect(new(poly), _clipOperand);
-
-    public WDir[] ConeVertices(WDir centerOffset, float innerRadius, float outerRadius, Angle centerDirection, Angle halfAngle)
-    {
-        // TODO: think of a better way to do that (analytical clipping?)
-        if (innerRadius >= outerRadius || innerRadius < 0f || halfAngle.Rad <= 0f)
-        {
-            return [];
-        }
-
-        var fullCircle = halfAngle.Rad >= MathF.PI;
-        var donut = innerRadius != 0;
-        var points = (donut, fullCircle) switch
-        {
-            (false, false) => CurveApprox.CircleSector(centerOffset, outerRadius, centerDirection - halfAngle, centerDirection + halfAngle, MaxApproxError),
-            (false, true) => CurveApprox.Circle(centerOffset, outerRadius, MaxApproxError),
-            (true, false) => CurveApprox.DonutSector(centerOffset, innerRadius, outerRadius, centerDirection - halfAngle, centerDirection + halfAngle, MaxApproxError),
-            (true, true) => CurveApprox.Donut(centerOffset, innerRadius, outerRadius, MaxApproxError),
-        };
-        return points;
-    }
-
-    public RelTriangle[] ClipAndTriangulateCone(WDir centerOffset, float innerRadius, float outerRadius, Angle centerDirection, Angle halfAngle)
-    {
-        return ClipAndTriangulate(ConeVertices(centerOffset, innerRadius, outerRadius, centerDirection, halfAngle));
-    }
-
-    public RelSimplifiedComplexPolygon ClipCone(WDir centerOffset, float innerRadius, float outerRadius, Angle centerDirection, Angle halfAngle)
-    {
-        return Clip(ConeVertices(centerOffset, innerRadius, outerRadius, centerDirection, halfAngle));
-    }
-
-    public RelTriangle[] ClipAndTriangulateCircle(WDir centerOffset, float radius)
-    {
-
-        return ClipAndTriangulate(CurveApprox.Circle(centerOffset, radius, MaxApproxError).AsSpan());
-    }
-
-    public RelTriangle[] TriangulateCircle(WDir centerOffset, float radius)
-    {
-
-        return Triangulate(new(CurveApprox.CircleL(centerOffset, radius, MaxApproxError)));
-    }
-
-    public RelSimplifiedComplexPolygon ClipCircle(WDir centerOffset, float radius)
-    {
-
-        return Clip(CurveApprox.Circle(centerOffset, radius, MaxApproxError).AsSpan());
-    }
-
-    public RelSimplifiedComplexPolygon CirclePolygon(WDir centerOffset, float radius)
-    {
-
-        return new(CurveApprox.CircleL(centerOffset, radius, MaxApproxError));
-    }
-
-    public WDir[] CapsuleVertices(WDir centerOffset, WDir direction, float radius, float length)
-    {
-        return CurveApprox.Capsule(centerOffset, direction, length, radius, MaxApproxError);
-    }
-
-    public RelSimplifiedComplexPolygon CapsulePolygon(WDir centerOffset, WDir direction, float radius, float length)
-    {
-        return new(CurveApprox.CapsuleL(centerOffset, direction, length, radius, MaxApproxError));
-    }
-
-    public WDir[] ArcCapsuleVertices(WDir startOffset, WDir toOrbitCenter, Angle angularLength, float radius)
-    {
-        var points = CurveApprox.ArcCapsule(toOrbitCenter, angularLength, radius, MaxApproxError);
-        var len = points.Length;
-        for (var i = 0; i < len; ++i)
-        {
-            points[i] += startOffset;
-        }
-
-        return points;
-    }
-
-    public RelTriangle[] ClipAndTriangulateCapsule(WDir centerOffset, WDir direction, float radius, float length)
-    {
-        return ClipAndTriangulate(CurveApprox.Capsule(centerOffset, direction, length, radius, MaxApproxError).AsSpan());
-    }
-
-    public RelTriangle[] TriangulateCapsule(WDir centerOffset, WDir direction, float radius, float length)
-    {
-        return Triangulate(CapsulePolygon(centerOffset, direction, radius, length));
-    }
-
-    public RelTriangle[] ClipAndTriangulateArcCapsule(WDir startOffset, WDir toOrbitCenter, Angle angularLength, float radius)
-    {
-        return ClipAndTriangulate(ArcCapsuleVertices(startOffset, toOrbitCenter, angularLength, radius));
-    }
-
-    public RelSimplifiedComplexPolygon ClipCapsule(WDir centerOffset, WDir direction, float radius, float length)
-    {
-        return Clip(CurveApprox.Capsule(centerOffset, direction, length, radius, MaxApproxError).AsSpan());
-    }
-
-    public RelSimplifiedComplexPolygon ClipArcCapsule(WDir startOffset, WDir toOrbitCenter, Angle angularLength, float radius)
-    {
-        return Clip(ArcCapsuleVertices(startOffset, toOrbitCenter, angularLength, radius));
-    }
-
-    public RelTriangle[] ClipAndTriangulateDonut(WDir centerOffset, float innerRadius, float outerRadius)
-    {
-        return ClipAndTriangulate(CurveApprox.DonutL(centerOffset, innerRadius, outerRadius, MaxApproxError).AsSpan());
-    }
-
-    public RelSimplifiedComplexPolygon ClipDonut(WDir centerOffset, float innerRadius, float outerRadius)
-    {
-        return Clip(CurveApprox.DonutL(centerOffset, innerRadius, outerRadius, MaxApproxError).AsSpan());
-    }
-
-    public RelTriangle[] ClipAndTriangulateTri(WDir oa, WDir ob, WDir oc)
-        => ClipAndTriangulate([oa, ob, oc]);
-
-    public RelTriangle[] ClipAndTriangulateIsoscelesTri(WDir apexOffset, WDir height, WDir halfBase)
-        => ClipAndTriangulateTri(apexOffset, apexOffset + height + halfBase, apexOffset + height - halfBase);
-
-    public RelTriangle[] ClipAndTriangulateIsoscelesTri(WDir apexOffset, Angle direction, Angle halfAngle, float height)
-    {
-        var dir = direction.ToDirection();
-        var normal = dir.OrthoL();
-        return ClipAndTriangulateIsoscelesTri(apexOffset, height * dir, height * halfAngle.Tan() * normal);
-    }
-
-    public RelSimplifiedComplexPolygon ClipTri(WDir oa, WDir ob, WDir oc)
-        => Clip([oa, ob, oc]);
-
-    public RelSimplifiedComplexPolygon ClipIsoscelesTri(WDir apexOffset, WDir height, WDir halfBase)
-        => ClipIsoscelesTri(apexOffset, apexOffset + height + halfBase, apexOffset + height - halfBase);
-
-    public RelSimplifiedComplexPolygon ClipIsoscelesTri(WDir apexOffset, Angle direction, Angle halfAngle, float height)
-    {
-        var dir = direction.ToDirection();
-        var normal = dir.OrthoL();
-        return ClipIsoscelesTri(apexOffset, height * dir, height * halfAngle.Tan() * normal);
-    }
-
-    public RelTriangle[] ClipAndTriangulateRect(WDir originOffset, WDir direction, float lenFront, float lenBack, float halfWidth)
-    {
-        var side = halfWidth * direction.OrthoR();
-        var front = originOffset + lenFront * direction;
-        var back = originOffset - lenBack * direction;
-        return ClipAndTriangulate([front + side, front - side, back - side, back + side]);
-    }
-
-    public RelTriangle[] ClipAndTriangulateRect(WDir originOffset, Angle direction, float lenFront, float lenBack, float halfWidth)
-        => ClipAndTriangulateRect(originOffset, direction.ToDirection(), lenFront, lenBack, halfWidth);
-
-    public RelTriangle[] ClipAndTriangulateRect(WDir startOffset, WDir endOffset, float halfWidth)
-    {
-        var dir = (endOffset - startOffset).Normalized();
-        var side = halfWidth * dir.OrthoR();
-        return ClipAndTriangulate([startOffset + side, startOffset - side, endOffset - side, endOffset + side]);
-    }
-
-    public RelTriangle[] TriangulateRect(WDir originOffset, WDir direction, float lenFront, float lenBack, float halfWidth)
-    {
-        var side = halfWidth * direction.OrthoR();
-        var front = originOffset + lenFront * direction;
-        var back = originOffset - lenBack * direction;
-        return Triangulate(new([front + side, front - side, back - side, back + side]));
-    }
-
-    public RelTriangle[] TriangulateRect(WDir originOffset, Angle direction, float lenFront, float lenBack, float halfWidth)
-        => TriangulateRect(originOffset, direction.ToDirection(), lenFront, lenBack, halfWidth);
-
-    public RelTriangle[] TriangulateRect(WDir startOffset, WDir endOffset, float halfWidth)
-    {
-        var dir = (endOffset - startOffset).Normalized();
-        var side = halfWidth * dir.OrthoR();
-        return Triangulate(new([startOffset + side, startOffset - side, endOffset - side, endOffset + side]));
-    }
-
-    public RelSimplifiedComplexPolygon RectPolygon(WDir originOffset, WDir direction, float lenFront, float lenBack, float halfWidth)
-    {
-        var side = halfWidth * direction.OrthoR();
-        var front = originOffset + lenFront * direction;
-        var back = originOffset - lenBack * direction;
-        return new([front + side, front - side, back - side, back + side]);
-    }
-
-    public RelSimplifiedComplexPolygon RectPolygon(WDir startOffset, WDir endOffset, float halfWidth)
-    {
-        var dir = (endOffset - startOffset).Normalized();
-        var side = halfWidth * dir.OrthoR();
-        return new([startOffset + side, startOffset - side, endOffset - side, endOffset + side]);
-    }
-
-    public RelSimplifiedComplexPolygon ClipRect(WDir originOffset, WDir direction, float lenFront, float lenBack, float halfWidth)
-    {
-        var side = halfWidth * direction.OrthoR();
-        var front = originOffset + lenFront * direction;
-        var back = originOffset - lenBack * direction;
-        return Clip([front + side, front - side, back - side, back + side]);
-    }
-
-    public RelSimplifiedComplexPolygon ClipRect(WDir originOffset, Angle direction, float lenFront, float lenBack, float halfWidth)
-        => ClipRect(originOffset, direction.ToDirection(), lenFront, lenBack, halfWidth);
-
-    public RelSimplifiedComplexPolygon ClipRect(WDir startOffset, WDir endOffset, float halfWidth)
-    {
-        var dir = (endOffset - startOffset).Normalized();
-        var side = halfWidth * dir.OrthoR();
-        return Clip([startOffset + side, startOffset - side, endOffset - side, endOffset + side]);
-    }
-
-    public RelSimplifiedComplexPolygon DonutPolygon(WDir centerOffset, float innerRadius, float outerRadius)
-    {
-        return new(CurveApprox.DonutL(centerOffset, innerRadius, outerRadius, MaxApproxError));
-    }
 }
 
 [SkipLocalsInit]
@@ -280,13 +55,18 @@ public sealed class ArenaBoundsCircle(float Radius, float MapResolution = 0.5f, 
     }
 
     public override void PathfindMap(Pathfinding.Map map, WPos center) => map.Init(_cachedMap ??= BuildMap(), center);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override bool Contains(in WDir offset)
     {
         var radius = Radius;
         return offset.LengthSq() <= radius * radius;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override float IntersectRay(in WDir originOffset, in WDir dir) => Intersect.RayCircle(originOffset, dir, Radius);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override WDir ClampToBounds(in WDir offset)
     {
         var radius = Radius;
@@ -296,37 +76,67 @@ public sealed class ArenaBoundsCircle(float Radius, float MapResolution = 0.5f, 
     private Pathfinding.Map BuildMap()
     {
         var radius = Radius;
-        var map = new Pathfinding.Map(MapResolution, default, radius, radius);
-        var iCell = 0;
+        var resolution = MapResolution;
+        var threshold = radius * radius / (resolution * resolution); // square of bounds radius, in grid coordinates
 
-        var width = map.Width;
-        var height = map.Height;
-        var resolution = map.Resolution;
+        // For this even grid the nearest cell's farthest corner is at (1, 1) in grid coordinates.
+        // A column with farthest-corner X coordinate cx can only contain a passable cell if cx^2 + 1 <= R^2,
+        // so size the map to the largest column that can possibly survive the conservative full-cell test.
+        var radiusCells = radius / resolution;
+        var halfCells = (int)MathF.Floor(radiusCells);
+        while (halfCells > 1 && (float)halfCells * halfCells + 1f > threshold)
+        {
+            --halfCells;
+        }
 
+        var width = 2 * halfCells;
+        var map = new Pathfinding.Map();
+        map.InitGrid(resolution, default, width, width);
         var pixelMaxG = map.PixelMaxG;
         var pixelPriority = map.PixelPriority;
 
-        var threshold = radius * radius / (resolution * resolution); // square of bounds radius, in grid coordinates
-        var dy = -height / 2 + 0.5f;
-        var dx = -width / 2 + 0.5f;
-
-        for (var y = 0; y < height; ++y, ++dy)
+        // Rasterize analytically. For increasing cy the largest admissible cx only moves inward, so across the
+        // entire half-map this inner loop decrements at most halfCells times; no per-cell tests or square roots.
+        var maxCX = halfCells;
+        for (var cy = 1; cy <= halfCells; ++cy)
         {
-            var cy = Math.Abs(dy) + 0.5f; // farthest corner
-            var cySq = cy * cy;
-            var dx2 = dx;
-            for (var x = 0; x < width; ++x, ++dx2)
+            var cySq = (float)cy * cy;
+            while (maxCX > 0 && (float)maxCX * maxCX + cySq > threshold)
             {
-                var cx = Math.Abs(dx2) + 0.5f;
-                if (cx * cx + cySq > threshold)
-                {
-                    pixelMaxG[iCell] = -1000f;
-                    pixelPriority[iCell] = float.MinValue;
-                }
-                ++iCell;
+                --maxCX;
             }
+
+            var blockedPerSide = halfCells - maxCX;
+            if (blockedPerSide == 0)
+            {
+                continue;
+            }
+
+            var topRow = halfCells - cy;
+            var bottomRow = halfCells + cy - 1;
+            BlockRow(topRow, blockedPerSide);
+            BlockRow(bottomRow, blockedPerSide);
         }
+
         return map;
+
+        void BlockRow(int y, int blockedPerSide)
+        {
+            var row = y * width;
+            if (blockedPerSide >= halfCells)
+            {
+                new Span<float>(pixelMaxG, row, width).Fill(-1000f);
+                new Span<float>(pixelPriority, row, width).Fill(float.MinValue);
+                return;
+            }
+
+            new Span<float>(pixelMaxG, row, blockedPerSide).Fill(-1000f);
+            new Span<float>(pixelPriority, row, blockedPerSide).Fill(float.MinValue);
+
+            var right = row + width - blockedPerSide;
+            new Span<float>(pixelMaxG, right, blockedPerSide).Fill(-1000f);
+            new Span<float>(pixelPriority, right, blockedPerSide).Fill(float.MinValue);
+        }
     }
 
     public override string ToString() => $"{nameof(ArenaBoundsCircle)}, Radius {Radius}, MapResolution: {MapResolution}";
@@ -364,58 +174,55 @@ public abstract class ABRect : ArenaBounds
         return poly;
     }
 
-    public override void PathfindMap(Pathfinding.Map map, WPos center) => map.Init(_cachedMap ??= BuildMap(), center);
+    public override void PathfindMap(Pathfinding.Map map, WPos center)
+    {
+        var source = _cachedMap ??= BuildMap();
+        map.Init(source, center + source.Center.ToWDir());
+    }
 
     private Pathfinding.Map BuildMap()
     {
-        var halfWidth = HalfWidth;
-        var halfHeight = HalfHeight;
-        var map = new Pathfinding.Map(MapResolution, default, halfWidth, halfHeight, Rotation);
-        // pixels can be partially covered by the rectangle, so we need to rasterize it carefully
-        var width = map.Width;
-        var height = map.Height;
-        var resolution = map.Resolution;
-        var pixelMaxG = map.PixelMaxG;
-        var pixelPriority = map.PixelPriority;
+        var resolution = MapResolution;
+        var width = GridExtent(HalfWidth, resolution);
+        var height = GridExtent(HalfHeight, resolution);
 
-        var dir = Rotation.ToDirection();
-        var dirX = dir.X;
-        var dirZ = dir.Z;
-        var normal = dir.OrthoL();
-        var normalX = normal.X;
-        var normalZ = normal.Z;
-
-        var dx = normal * resolution;
-        var dy = dir * resolution;
-        var startPos = map.Center - ((width >> 1) - 0.5f) * dx - ((height >> 1) - 0.5f) * dy;
-        var halfPixel = 0.5f * resolution;
-
-        for (var y = 0; y < height; ++y)
+        // Existing map coordinates use floor(size/2) as the grid origin. For an odd dimension the geometric
+        // midpoint is therefore +0.5 cell from Map.Center, so bias the cached center by -0.5 cell to keep the
+        // grid itself centered on the arena rectangle.
+        var dir = Orientation;
+        var center = default(WPos);
+        if ((width & 1) != 0)
         {
-            var posY = startPos + y * dy;
-            var rowBase = y * width;
-            for (var x = 0; x < width; ++x)
-            {
-                var pos = posY + x * dx;
-                var pX = pos.X;
-                var pZ = pos.Z;
-
-                var distParr = pX * dirX + pZ * dirZ;
-                var distOrtho = pX * normalX + pZ * normalZ;
-
-                if (!((distParr - halfPixel) >= -halfHeight && (distParr + halfPixel) <= halfHeight) || !((distOrtho - halfPixel) >= -halfWidth && (distOrtho + halfPixel) <= halfWidth))
-                {
-                    pixelMaxG[rowBase + x] = -1000f;
-                    pixelPriority[rowBase + x] = float.MinValue;
-                }
-            }
+            center -= 0.5f * resolution * dir.OrthoL();
         }
+        if ((height & 1) != 0)
+        {
+            center -= 0.5f * resolution * dir;
+        }
+
+        var map = new Pathfinding.Map();
+        map.InitGrid(resolution, center, width, height, Rotation);
+
         return map;
+
+        static int GridExtent(float halfExtent, float resolution)
+        {
+            var cells = 2f * halfExtent / resolution;
+            var nearest = MathF.Round(cells);
+            if (MathF.Abs(cells - nearest) <= 0.001f)
+            {
+                cells = nearest;
+            }
+            return (int)MathF.Floor(cells);
+        }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override bool Contains(in WDir offset) => offset.InRect(Orientation, HalfHeight, HalfHeight, HalfWidth);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override float IntersectRay(in WDir originOffset, in WDir dir) => Intersect.RayRect(originOffset, dir, Orientation, HalfWidth, HalfHeight);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override WDir ClampToBounds(in WDir offset)
     {
         var orientation = Orientation;
@@ -460,7 +267,6 @@ public sealed class ArenaBoundsCustom : ArenaBounds
     public readonly float HalfWidth, HalfHeight;
     private readonly float offset;
     public readonly WPos Center;
-    public bool IsCircle; // can be used by gaze component for gazes outside of the arena
 
     public ArenaBoundsCustom(Shape[] UnionShapes, Shape[]? DifferenceShapes = null, Shape[]? AdditionalShapes = null, float MapResolution = 0.5f, float ScaleFactor = 1f, bool AllowObstacleMap = false, float Offset = default, bool AdjustForHitboxInwards = false, bool AdjustForHitboxOutwards = false)
     : base(BuildBounds(UnionShapes, DifferenceShapes ?? [], AdditionalShapes ?? [], ScaleFactor, AdjustForHitboxInwards, AdjustForHitboxOutwards, out var poly, out var center, out var halfWidth, out var halfHeight), MapResolution, ScaleFactor, AllowObstacleMap)
@@ -489,7 +295,7 @@ public sealed class ArenaBoundsCustom : ArenaBounds
         var additionalPolygons = ParseShapes(additionalShapes);
         var combinedPoly = CombinePolygons(unionPolygons, differencePolygons, additionalPolygons, adjustForHitboxInwards ? -0.5f : adjustForHitboxOutwards ? 0.5f : default);
 
-        var props = combinedPoly.CalculateCenterAndRecenter();
+        var props = CalculateCenterAndRecenter(combinedPoly);
         var center = props.Center;
         var maxX = props.maxX;
         var minX = props.minX;
@@ -517,7 +323,12 @@ public sealed class ArenaBoundsCustom : ArenaBounds
     }
 
     protected override RelSimplifiedComplexPolygon BuildClipPoly() => Polygon;
-    public override void PathfindMap(Pathfinding.Map map, WPos center) => map.Init(_cachedMap ??= BuildMap(), center);
+
+    public override void PathfindMap(Pathfinding.Map map, WPos center)
+    {
+        var source = _cachedMap ??= BuildMap();
+        map.Init(source, center + source.Center.ToWDir());
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override bool Contains(in WDir offset) => Polygon.Contains(offset);
@@ -542,30 +353,50 @@ public sealed class ArenaBoundsCustom : ArenaBounds
     private Pathfinding.Map BuildMap()
     {
         var polygon = offset != default ? Polygon.Offset(offset) : Polygon;
-        if (offset != default)
+        var resolution = MapResolution;
+
+        var bounds = CalculateOptimalGridBounds(polygon, resolution);
+
+        // The axis-aligned candidate is evaluated first and wins all equal-cell-count ties. If it wins, keep the
+        // polygon in its existing coordinate frame so offset == 0 can reuse Polygon's already-built boundary index.
+        // Only a rotation that strictly reduces the pathfinding cell count pays for transform + reindex.
+        if (bounds.RequiresTransform)
         {
+            polygon = TransformToGrid(polygon, bounds);
             polygon.InitPolygonIndex();
         }
-        var map = new Pathfinding.Map(MapResolution, default, HalfWidth, HalfHeight);
+        else if (offset != default)
+        {
+            // Offset() creates a new polygon and therefore still needs an index even when no rotation is useful
+            polygon.InitPolygonIndex();
+        }
+
+        var map = new Pathfinding.Map();
+        var height = bounds.Height;
+        var width = bounds.Width;
+        map.InitGrid(resolution, bounds.Center, width, height, bounds.Rotation);
 
         var pixelMaxG = map.PixelMaxG;
         var pixelPriority = map.PixelPriority;
-        var width = map.Width;
-        var height = map.Height;
-        var resolution = map.Resolution;
         // var startTime = Stopwatch.GetTimestamp();
         // for (var i = 0; i < 10000; ++i)
         // {
-        var halfCell = resolution * 0.49999f; // tiny offset to account for floating point inaccuracies and the assumption that being exactly on the polygon border is safe
-
+        var halfCell = resolution * 0.49999f;
         var dx = new WDir(resolution, default);
         var dy = new WDir(default, resolution);
-        var startPos = map.Center - ((width >> 1) - 0.5f) * dx - ((height >> 1) - 0.5f) * dy;
+
+        // Transformed polygons are in map-local coordinates, so their grid is centered around local zero. Unrotated
+        // polygons remain in arena-relative coordinates and can reuse their existing index; include Map.Center in the
+        // raster origin so odd-grid parity shifts (and offset-polygon bbox shifts) need no polygon transformation
+
+        var rasterCenter = bounds.RequiresTransform ? default : map.Center.ToWDir();
+        var startPos = rasterCenter - ((width >> 1) - 0.5f) * dx - ((height >> 1) - 0.5f) * dy;
 
         Parallel.ForEach(Partitioner.Create(0, height), range =>
         {
             var r1 = range.Item1;
             var r2 = range.Item2;
+
             for (var y = r1; y < r2; ++y)
             {
                 var rowOffset = y * width;
@@ -574,25 +405,36 @@ public sealed class ArenaBoundsCustom : ArenaBounds
                 for (var x = 0; x < width; ++x)
                 {
                     var cellCenter = posY + x * dx;
-                    var relativeCenter = new WDir(cellCenter.X, cellCenter.Z);
-
-                    var relation = polygon.PolygonAABBIntersection(relativeCenter, halfCell, halfCell);
-
+                    var relation = polygon.PolygonAABBIntersection(cellCenter, halfCell, halfCell);
                     if (relation == PolygonShapeRelation.Inside)
                     {
                         continue;
                     }
 
-                    var index = rowOffset + x;
-                    pixelMaxG[index] = -1000f;
-                    pixelPriority[index] = float.MinValue;
+                    pixelMaxG[rowOffset + x] = -1000f;
+                    pixelPriority[rowOffset + x] = float.MinValue;
                 }
             }
         });
         // }
         // var rasterFinish = Stopwatch.GetTimestamp();
         // Service.Log($"raster time: {(rasterFinish - startTime) * 1000d / Stopwatch.Frequency}ms");
+        CropRasterizedMap(map);
         return map;
+    }
+
+    private static int GridExtent(float extent, float resolution)
+    {
+        var cells = extent / resolution;
+        var nearest = MathF.Round(cells);
+        if (MathF.Abs(cells - nearest) <= 0.001f)
+        {
+            cells = nearest;
+        }
+
+        // A neighboring cell beyond this centered interval necessarily crosses the oriented bounding box, so it
+        // can never survive the conservative full-cell-inside-polygon test
+        return (int)MathF.Floor(cells);
     }
 
     private static RelSimplifiedComplexPolygon CombinePolygons(RelSimplifiedComplexPolygon[] unionPolygons, RelSimplifiedComplexPolygon[] differencePolygons, RelSimplifiedComplexPolygon[] secondUnionPolygons, float offset)
@@ -637,5 +479,706 @@ public sealed class ArenaBoundsCustom : ArenaBounds
             vertsCount += parts[i].Vertices.Count;
         }
         return $"{nameof(ArenaBoundsCustom)}, Radius {Radius}, HalfWidth: {HalfWidth}, HalfHeight: {HalfHeight}, MapResolution: {MapResolution}, Pathfinding offset: {offset}, Vertices: {vertsCount}, ScaleFactor: {ScaleFactor}";
+    }
+
+    private readonly struct OrientedGridBounds(WPos center, Angle rotation, int width, int height, bool requiresTransform)
+    {
+        public readonly WPos Center = center;
+        public readonly Angle Rotation = rotation;
+        public readonly int Width = width;
+        public readonly int Height = height;
+        public readonly bool RequiresTransform = requiresTransform;
+    }
+
+    // Find a compact oriented bounding rectangle. The exact minimum-area rectangle has an axis parallel to a
+    // convex-hull edge. The axis-aligned candidate is evaluated first and is retained for every equal-cell-count tie,
+    // allowing BuildMap to reuse the existing polygon/index. A rotated candidate is selected only when it strictly
+    // reduces the pathfinding cell count; geometric area is only a tie-breaker between already-rotated candidates.
+    //
+    // Candidate extents use rotating calipers: after one initialization scan, the four support vertices (min/max on
+    // each local axis) move monotonically around the convex hull as its edge direction rotates.
+    // Grid dimensions are exact integers and may be odd. Shape-specific dead outer layers are removed after raster.
+    private OrientedGridBounds CalculateOptimalGridBounds(RelSimplifiedComplexPolygon poly, float resolution)
+    {
+        var totalVertices = 0;
+        var maxExteriorVertices = 0;
+        var parts = poly.Parts;
+        var partCount = parts.Count;
+
+        for (var i = 0; i < partCount; ++i)
+        {
+            var count = parts[i].Exterior.Length;
+            totalVertices += count;
+            if (count > maxExteriorVertices)
+            {
+                maxExteriorVertices = count;
+            }
+        }
+
+        // Each exterior is already a simple polygon contour in boundary order. Build its convex hull directly in
+        // linear time with Melkman's deque algorithm before doing any global sort. Highly concave arena contours
+        // commonly collapse from hundreds of vertices to only a few dozen hull vertices, so for multiple parts the
+        // global monotone-chain sort sees only the union of those small per-part hulls. The common single-part case
+        // skips sorting entirely.
+        Span<WDir> hullStorage = stackalloc WDir[totalVertices * 2];
+        Span<WDir> contourWorkspace = stackalloc WDir[maxExteriorVertices * 2 + 1];
+        int hullCount;
+
+        if (partCount == 1)
+        {
+            hullCount = BuildSimplePolygonHull(parts[0].Exterior, hullStorage, contourWorkspace);
+        }
+        else
+        {
+            Span<WDir> points = stackalloc WDir[totalVertices];
+            var pointIndex = 0;
+            for (var i = 0; i < partCount; ++i)
+            {
+                var exterior = parts[i].Exterior;
+                pointIndex += BuildSimplePolygonHull(exterior, points[pointIndex..], contourWorkspace);
+            }
+
+            var reducedPoints = points[..pointIndex];
+            reducedPoints.Sort(static (a, b) =>
+            {
+                var cmp = a.X.CompareTo(b.X);
+                return cmp != 0 ? cmp : a.Z.CompareTo(b.Z);
+            });
+            hullCount = BuildConvexHull(reducedPoints, hullStorage);
+        }
+
+        var hull = hullStorage[..hullCount];
+
+        var bestCellCount = long.MaxValue;
+        var bestArea = float.MaxValue;
+        OrientedGridBounds best = default;
+
+        void EvaluateBounds(float minX, float maxX, float minZ, float maxZ, WDir xAxis, WDir zAxis, bool requiresTransform)
+        {
+            var extentX = maxX - minX;
+            var extentZ = maxZ - minZ;
+            var gridWidth = GridExtent(extentX, resolution);
+            var gridHeight = GridExtent(extentZ, resolution);
+            var cellCount = (long)gridWidth * gridHeight;
+            var area = extentX * extentZ;
+
+            // Never replace the unrotated baseline for an equal cell count: the transformed polygon would have the
+            // same per-frame pathfinding footprint while BuildMap would pay an allocation, transform and full index
+            // rebuild. Once a rotated candidate has strictly beaten the baseline, retain geometric area as a
+            // deterministic tie-breaker between other rotated candidates with that same smaller cell count.
+            if (cellCount > bestCellCount || cellCount == bestCellCount && (!best.RequiresTransform || area >= bestArea))
+            {
+                return;
+            }
+
+            var geometricCenter = xAxis * ((minX + maxX) * 0.5f) + zAxis * ((minZ + maxZ) * 0.5f);
+            var rotation = zAxis.ToAngle();
+
+            // Only transformed candidates may be transposed to make the larger dimension rows. Keeping the baseline
+            // exactly axis-aligned is what permits reuse of the original polygon/index when rotation saves no cells.
+            if (requiresTransform && gridWidth > gridHeight)
+            {
+                (gridWidth, gridHeight) = (gridHeight, gridWidth);
+                rotation += 90f.Degrees();
+            }
+
+            var dir = rotation.ToDirection();
+            var mapCenter = geometricCenter;
+            if ((gridWidth & 1) != 0)
+            {
+                mapCenter -= 0.5f * resolution * dir.OrthoL();
+            }
+            if ((gridHeight & 1) != 0)
+            {
+                mapCenter -= 0.5f * resolution * dir;
+            }
+
+            bestCellCount = cellCount;
+            bestArea = area;
+            best = new(mapCenter.ToWPos(), rotation, gridWidth, gridHeight, requiresTransform);
+        }
+
+        // Establish the exact unrotated baseline first. Equal-cell-count rotated candidates can never displace it.
+        if (hullCount != 0)
+        {
+            var minX = float.MaxValue;
+            var maxX = float.MinValue;
+            var minZ = float.MaxValue;
+            var maxZ = float.MinValue;
+            for (var i = 0; i < hullCount; ++i)
+            {
+                var p = hull[i];
+                if (p.X < minX)
+                {
+                    minX = p.X;
+                }
+                if (p.X > maxX)
+                {
+                    maxX = p.X;
+                }
+                if (p.Z < minZ)
+                {
+                    minZ = p.Z;
+                }
+                if (p.Z > maxZ)
+                {
+                    maxZ = p.Z;
+                }
+            }
+            EvaluateBounds(minX, maxX, minZ, maxZ, new WDir(1f, 0f), new WDir(0f, 1f), false);
+        }
+
+        // Initialize the four support points for the first non-degenerate hull edge, then advance each one only
+        // forward as subsequent edge axes rotate around the CCW hull.
+        var firstEdge = -1;
+        WDir firstXAxis = default;
+        WDir firstZAxis = default;
+        for (var i = 0; i < hullCount; ++i)
+        {
+            var edge = hull[(i + 1) % hullCount] - hull[i];
+            var lenSq = edge.LengthSq();
+            if (lenSq > 1e-12f)
+            {
+                firstEdge = i;
+                firstXAxis = edge / MathF.Sqrt(lenSq);
+                firstZAxis = firstXAxis.OrthoR();
+                break;
+            }
+        }
+
+        if (firstEdge >= 0)
+        {
+            FindSupportIndices(hull, firstXAxis, firstZAxis, out var minXIndex, out var maxXIndex, out var minZIndex, out var maxZIndex);
+
+            for (var step = 0; step < hullCount; ++step)
+            {
+                var i = (firstEdge + step) % hullCount;
+                var edge = hull[(i + 1) % hullCount] - hull[i];
+                var lenSq = edge.LengthSq();
+                if (lenSq <= 1e-5f)
+                {
+                    continue;
+                }
+
+                var xAxis = edge / MathF.Sqrt(lenSq);
+                var zAxis = xAxis.OrthoR();
+
+                if (step != 0)
+                {
+                    minXIndex = AdvanceSupport(hull, minXIndex, xAxis, false);
+                    maxXIndex = AdvanceSupport(hull, maxXIndex, xAxis, true);
+                    minZIndex = AdvanceSupport(hull, minZIndex, zAxis, false);
+                    maxZIndex = AdvanceSupport(hull, maxZIndex, zAxis, true);
+                }
+
+                EvaluateBounds(hull[minXIndex].Dot(xAxis), hull[maxXIndex].Dot(xAxis),
+                    hull[minZIndex].Dot(zAxis), hull[maxZIndex].Dot(zAxis),
+                    xAxis, zAxis, true);
+            }
+        }
+
+        return best;
+
+        static void FindSupportIndices(ReadOnlySpan<WDir> hull, WDir xAxis, WDir zAxis, out int minXIndex, out int maxXIndex, out int minZIndex, out int maxZIndex)
+        {
+            minXIndex = maxXIndex = minZIndex = maxZIndex = 0;
+            var hull0 = hull[0];
+            var minX = hull0.Dot(xAxis);
+            var maxX = minX;
+            var minZ = hull0.Dot(zAxis);
+            var maxZ = minZ;
+
+            var len = hull.Length;
+            for (var i = 1; i < len; ++i)
+            {
+                var p = hull[i];
+                var px = p.Dot(xAxis);
+                var pz = p.Dot(zAxis);
+                if (px < minX)
+                {
+                    minX = px;
+                    minXIndex = i;
+                }
+                if (px > maxX)
+                {
+                    maxX = px;
+                    maxXIndex = i;
+                }
+                if (pz < minZ)
+                {
+                    minZ = pz;
+                    minZIndex = i;
+                }
+                if (pz > maxZ)
+                {
+                    maxZ = pz;
+                    maxZIndex = i;
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static int AdvanceSupport(ReadOnlySpan<WDir> hull, int index, WDir axis, bool findMax)
+        {
+            var count = hull.Length;
+            while (true)
+            {
+                var next = index + 1;
+                if (next == count)
+                {
+                    next = 0;
+                }
+
+                var currentProjection = hull[index].Dot(axis);
+                var nextProjection = hull[next].Dot(axis);
+                if (findMax ? nextProjection <= currentProjection : nextProjection >= currentProjection)
+                {
+                    return index;
+                }
+                index = next;
+            }
+        }
+
+        // Linear convex hull for a simple polygon/polyline whose vertices are already in boundary order.
+        // The deque stores the first hull vertex twice (at both ends) while processing; output is compacted without
+        // the duplicate closing vertex and normalized to CCW order because the rotating-calipers pass relies on it.
+        static int BuildSimplePolygonHull(ReadOnlySpan<WDir> polygon, Span<WDir> output, Span<WDir> deque)
+        {
+            var count = polygon.Length;
+            // Start at any non-collinear cyclic triple. This avoids special handling for contours that begin with a
+            // run of collinear edges while keeping the remaining input a simple boundary-ordered polyline.
+            var start = -1;
+            for (var i = 0; i < count; ++i)
+            {
+                var a = polygon[i];
+                var b = polygon[(i + 1) % count];
+                var c = polygon[(i + 2) % count];
+                if ((b - a).Cross(c - b) != 0f)
+                {
+                    start = i;
+                    break;
+                }
+            }
+
+            // Degenerate all-collinear contour: the convex hull is just its two lexicographic extremes.
+            if (start < 0)
+            {
+                var min = polygon[0];
+                var max = min;
+                var minX = min.X;
+                var maxX = max.X;
+                var minZ = min.Z;
+                var maxZ = max.Z;
+
+                for (var i = 1; i < count; ++i)
+                {
+                    var p = polygon[i];
+                    var pX = p.X;
+                    var pZ = p.Z;
+                    if (pX < minX || pX == minX && pZ < minZ)
+                    {
+                        min = p;
+                    }
+                    if (pX > maxX || pX == maxX && pZ > maxZ)
+                    {
+                        max = p;
+                    }
+                }
+                output[0] = min;
+                if (max == min)
+                {
+                    return 1;
+                }
+                output[1] = max;
+                return 2;
+            }
+
+            var p0 = polygon[start];
+            var p1 = polygon[(start + 1) % count];
+            var p2 = polygon[(start + 2) % count];
+            var bottom = count - 2;
+            var top = count + 1;
+
+            if ((p1 - p0).Cross(p2 - p1) > 0f)
+            {
+                deque[bottom] = p2;
+                deque[bottom + 1] = p0;
+                deque[bottom + 2] = p1;
+                deque[top] = p2;
+            }
+            else
+            {
+                deque[bottom] = p2;
+                deque[bottom + 1] = p1;
+                deque[bottom + 2] = p0;
+                deque[top] = p2;
+            }
+
+            for (var step = 3; step < count; ++step)
+            {
+                var p = polygon[(start + step) % count];
+
+                // Strict left turns match BuildConvexHull below: collinear boundary points are discarded.
+                if (IsLeft(deque[bottom], deque[bottom + 1], p) && IsLeft(deque[top - 1], deque[top], p))
+                {
+                    continue;
+                }
+
+                while (!IsLeft(deque[bottom], deque[bottom + 1], p))
+                {
+                    ++bottom;
+                }
+                deque[--bottom] = p;
+
+                while (!IsLeft(deque[top - 1], deque[top], p))
+                {
+                    --top;
+                }
+                deque[++top] = p;
+            }
+
+            // deque[bottom] == deque[top]; omit the duplicate closing vertex
+            var hullCount = top - bottom;
+            var hull = deque.Slice(bottom, hullCount);
+            hull.CopyTo(output);
+
+            // Melkman can emit either winding depending on the source contour. Normalize to CCW for calipers
+            var signedArea2 = 0f;
+            for (var i = 0; i < hullCount; ++i)
+            {
+                signedArea2 += output[i].Cross(output[(i + 1) % hullCount]);
+            }
+            if (signedArea2 < 0f)
+            {
+                for (int i = 0, j = hullCount - 1; i < j; ++i, --j)
+                {
+                    (output[i], output[j]) = (output[j], output[i]);
+                }
+            }
+
+            return hullCount;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static bool IsLeft(WDir a, WDir b, WDir p) => (b - a).Cross(p - b) > 0f;
+        }
+
+        static int BuildConvexHull(ReadOnlySpan<WDir> points, Span<WDir> hull)
+        {
+            var countP = points.Length;
+            var hullCount = 0;
+
+            // Lower hull
+            for (var i = 0; i < countP; ++i)
+            {
+                var p = points[i];
+
+                while (hullCount >= 2)
+                {
+                    var a = hull[hullCount - 2];
+                    var b = hull[hullCount - 1];
+
+                    if ((b - a).Cross(p - b) > 0f)
+                    {
+                        break;
+                    }
+
+                    --hullCount;
+                }
+
+                hull[hullCount++] = p;
+            }
+
+            // Upper hull
+            var lowerCount = hullCount;
+
+            for (var i = countP - 2; i >= 0; --i)
+            {
+                var p = points[i];
+
+                while (hullCount > lowerCount)
+                {
+                    var a = hull[hullCount - 2];
+                    var b = hull[hullCount - 1];
+
+                    if ((b - a).Cross(p - b) > 0f)
+                    {
+                        break;
+                    }
+
+                    --hullCount;
+                }
+
+                hull[hullCount++] = p;
+            }
+
+            // Final point duplicates the first
+            --hullCount;
+            return hullCount;
+        }
+    }
+
+    private static void CropRasterizedMap(Pathfinding.Map map)
+    {
+        var width = map.Width;
+        var height = map.Height;
+        if (width <= 1 && height <= 1)
+        {
+            return;
+        }
+
+        var pixelMaxG = map.PixelMaxG;
+
+        bool RowHasPassableCell(int y, int x1 = 0, int x2 = -1)
+        {
+            if (x2 < 0)
+            {
+                x2 = width - 1;
+            }
+            var index = y * width + x1;
+            for (var x = x1; x <= x2; ++x, ++index)
+            {
+                if (pixelMaxG[index] >= 0f)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool ColumnHasPassableCell(int x, int y1, int y2)
+        {
+            var index = y1 * width + x;
+            for (var y = y1; y <= y2; ++y, index += width)
+            {
+                if (pixelMaxG[index] >= 0f)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        var minY = 0;
+        while (minY < height && !RowHasPassableCell(minY))
+        {
+            ++minY;
+        }
+
+        var maxY = height - 1;
+        while (maxY > minY && !RowHasPassableCell(maxY))
+        {
+            --maxY;
+        }
+
+        var minX = 0;
+        while (minX < width && !ColumnHasPassableCell(minX, minY, maxY))
+        {
+            ++minX;
+        }
+
+        var maxX = width - 1;
+        while (maxX > minX && !ColumnHasPassableCell(maxX, minY, maxY))
+        {
+            --maxX;
+        }
+
+        var newWidth = maxX - minX + 1;
+        var newHeight = maxY - minY + 1;
+        if (newWidth == width && newHeight == height)
+        {
+            return;
+        }
+
+        var pixelPriority = map.PixelPriority;
+        for (var y = 0; y < newHeight; ++y)
+        {
+            var oldRow = (minY + y) * width + minX;
+            var newRow = y * newWidth;
+            Array.Copy(pixelMaxG, oldRow, pixelMaxG, newRow, newWidth);
+            Array.Copy(pixelPriority, oldRow, pixelPriority, newRow, newWidth);
+        }
+
+        // Preserve the exact old cell lattice for arbitrary odd/even crops. Map.Center is the grid vertex at
+        // floor(size/2), so shift by the difference between the retained old and new logical origins
+        var shiftXCells = minX + (newWidth >> 1) - (width >> 1);
+        var shiftYCells = minY + (newHeight >> 1) - (height >> 1);
+
+        var dir = map.Rotation.ToDirection();
+        var dx = dir.OrthoL() * map.Resolution;
+        var dy = dir * map.Resolution;
+        map.Center += shiftXCells * dx + shiftYCells * dy;
+
+        map.Width = newWidth;
+        map.Height = newHeight;
+        map.MinX = map.MinY = 0;
+        map.MaxX = newWidth - 1;
+        map.MaxY = newHeight - 1;
+    }
+
+    private RelSimplifiedComplexPolygon TransformToGrid(RelSimplifiedComplexPolygon poly, in OrientedGridBounds bounds)
+    {
+        var inverseRotation = (-bounds.Rotation).ToDirection();
+        var offset = -bounds.Center.ToWDir().Rotate(inverseRotation);
+        return poly.Transform(offset, inverseRotation);
+    }
+
+    private static (float minX, float maxX, float minZ, float maxZ, WPos Center) CalculateCenterAndRecenter(RelSimplifiedComplexPolygon poly)
+    {
+        var minX = float.MaxValue;
+        var maxX = float.MinValue;
+        var minZ = float.MaxValue;
+        var maxZ = float.MinValue;
+        var parts = poly.Parts;
+        var count = parts.Count;
+
+        if (Avx.IsSupported)
+        {
+            var vectorMin = Vector256.Create(float.PositiveInfinity);
+            var vectorMax = Vector256.Create(float.NegativeInfinity);
+            var countV = Vector256<float>.Count;
+            for (var i = 0; i < count; ++i)
+            {
+                var values = MemoryMarshal.Cast<WDir, float>(parts[i].Exterior);
+                var len = values.Length;
+                var j = 0;
+                if (len >= countV)
+                {
+                    ref var source = ref MemoryMarshal.GetReference(values);
+                    var vectorEnd = len - countV;
+                    for (; j <= vectorEnd; j += countV)
+                    {
+                        var v = Vector256.LoadUnsafe(ref source, (nuint)j);
+                        vectorMin = Avx.Min(vectorMin, v);
+                        vectorMax = Avx.Max(vectorMax, v);
+                    }
+                }
+
+                // Every WDir contributes two floats, so a vector-sized prefix also leaves an even-sized tail
+                for (; j < len; j += 2)
+                {
+                    var x = values[j];
+                    var z = values[j + 1];
+                    if (x < minX)
+                    {
+                        minX = x;
+                    }
+                    if (x > maxX)
+                    {
+                        maxX = x;
+                    }
+                    if (z < minZ)
+                    {
+                        minZ = z;
+                    }
+                    if (z > maxZ)
+                    {
+                        maxZ = z;
+                    }
+                }
+            }
+
+            // X occupies even lanes and Z odd lanes in the interleaved WDir layout
+            for (var lane = 0; lane < countV; lane += 2)
+            {
+                var xMin = vectorMin.GetElement(lane);
+                var xMax = vectorMax.GetElement(lane);
+                var zMin = vectorMin.GetElement(lane + 1);
+                var zMax = vectorMax.GetElement(lane + 1);
+                if (xMin < minX)
+                {
+                    minX = xMin;
+                }
+                if (xMax > maxX)
+                {
+                    maxX = xMax;
+                }
+                if (zMin < minZ)
+                {
+                    minZ = zMin;
+                }
+                if (zMax > maxZ)
+                {
+                    maxZ = zMax;
+                }
+            }
+        }
+        else
+        {
+            for (var i = 0; i < count; ++i)
+            {
+                var ext = parts[i].Exterior;
+                var len = ext.Length;
+                for (var j = 0; j < len; ++j)
+                {
+                    var vertex = ext[j];
+                    var vX = vertex.X;
+                    var vZ = vertex.Z;
+                    if (vX < minX)
+                    {
+                        minX = vX;
+                    }
+                    if (vX > maxX)
+                    {
+                        maxX = vX;
+                    }
+                    if (vZ < minZ)
+                    {
+                        minZ = vZ;
+                    }
+                    if (vZ > maxZ)
+                    {
+                        maxZ = vZ;
+                    }
+                }
+            }
+        }
+
+        var center = new WPos((minX + maxX) * 0.5f, (minZ + maxZ) * 0.5f);
+        var dir = center.ToWDir();
+
+        if (Avx.IsSupported)
+        {
+            var countV = Vector256<float>.Count;
+            var centerX = center.X;
+            var centerZ = center.Z;
+
+            var centerVector = Vector256.Create(centerX, centerZ, centerX, centerZ, centerX, centerZ, centerX, centerZ);
+            for (var i = 0; i < count; ++i)
+            {
+                var values = MemoryMarshal.Cast<WDir, float>(CollectionsMarshal.AsSpan(parts[i].Vertices));
+                var len = values.Length;
+                var j = 0;
+                if (len >= countV)
+                {
+                    ref var destination = ref MemoryMarshal.GetReference(values);
+                    var vectorEnd = len - countV;
+                    for (; j <= vectorEnd; j += countV)
+                    {
+                        var v = Vector256.LoadUnsafe(ref destination, (nuint)j);
+                        Avx.Subtract(v, centerVector).StoreUnsafe(ref destination, (nuint)j);
+                    }
+                }
+                for (; j < len; j += 2)
+                {
+                    values[j] -= centerX;
+                    values[j + 1] -= centerZ;
+                }
+            }
+        }
+        else
+        {
+            for (var i = 0; i < count; ++i)
+            {
+                var verts = CollectionsMarshal.AsSpan(parts[i].Vertices);
+                var len = verts.Length;
+                for (var j = 0; j < len; ++j)
+                {
+                    verts[j] -= dir;
+                }
+            }
+        }
+
+        poly.InitPolygonIndex();
+        return (minX, maxX, minZ, maxZ, center);
     }
 }
