@@ -10,7 +10,6 @@ General (for all phases / multiple phases)
     Be careful when changing lightning tho as it is used by gazes as well
 
 Phase 1:
-- WaveCannonTowers Priority order
 - P1 arrow puddles with arrows
 - TeleTrouncing - add support to allow different points of views for different players in the replay - need to use pcSlot and slot of the raid members
 

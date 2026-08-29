@@ -648,18 +648,16 @@ sealed class DMUStates : StateMachineBuilder
         Phase1TeleTrouncing(id + 0x3000, 6.8f);
     }
 
-    void Phase1RevoltingRuinIII(uint id, float delay)
-    {
+    void Phase1RevoltingRuinIII(uint id, float delay) {
         ComponentCondition<Hints>(id + 0x01, 0.5f, static o => !o.active)
             .DeactivateOnExit<Hints>()
-            .ActivateOnEnter<RevoltingRuinIIIFirst>() // Activated early for pre-position movement - may change to a movement component instead for TB
+            .ActivateOnEnter<RevoltingRuinIIIFirst>()
             .ActivateOnEnter<RevoltingRuinIIISecond>();
-
-        CastStart(id, (uint)AID.RevoltingRuinIIIFirstHit, delay);
-
+        CastStart(id, (uint)AID.RevoltingRuinIIIFirstHit, delay)
+            .ExecOnEnter<RevoltingRuinIIIFirst>(static o => o.EnableHints = true);
         ComponentCondition<RevoltingRuinIIIFirst>(id + 0x10, 5.1f, static o => o.NumCasts > 0, "1st Tankbuster Resolve")
-            .DeactivateOnExit<RevoltingRuinIIIFirst>();
-
+            .DeactivateOnExit<RevoltingRuinIIIFirst>()
+            .ExecOnExit<RevoltingRuinIIISecond>(static o => o.EnableHints = true);
         ComponentCondition<RevoltingRuinIIISecond>(id + 0x20, 3.2f, static o => o.NumCasts > 0, "2nd Tankbuster Resolve")
             .DeactivateOnExit<RevoltingRuinIIISecond>();
     }
@@ -731,9 +729,11 @@ sealed class DMUStates : StateMachineBuilder
             .ActivateOnExit<RevoltingRuinIIISecond>()
             .ActivateOnExit<GravitationalWave>()
             .ExecOnExit<GravitationalWave>(static o => o.Risky = true);
-        CastStart(id + 0x160, (uint)AID.RevoltingRuinIIIFirstHit, 0.7f);
+        CastStart(id + 0x160, (uint)AID.RevoltingRuinIIIFirstHit, 0.7f)
+            .ExecOnEnter<RevoltingRuinIIIFirst>(static o => o.EnableHints = true);
         ComponentCondition<RevoltingRuinIIIFirst>(id + 0x162, 5.0f, static o => o.NumCasts > 0, "1st Tankbuster Resolve")
-            .DeactivateOnExit<RevoltingRuinIIIFirst>();
+            .DeactivateOnExit<RevoltingRuinIIIFirst>()
+            .ExecOnExit<RevoltingRuinIIISecond>(static o => o.EnableHints = true);
         ComponentCondition<RevoltingRuinIIISecond>(id + 0x165, 3.2f, static o => o.NumCasts > 0, "2nd Tankbuster Resolve")
             .DeactivateOnExit<RevoltingRuinIIISecond>()
             .ActivateOnExit<Gravitas>()
@@ -746,13 +746,15 @@ sealed class DMUStates : StateMachineBuilder
             .ActivateOnEnter<GravitationalWave>()
             .ExecOnExit<GravitationalWave>(static o => o.Risky = true);
         ComponentCondition<GravitationalWave>(id + 0x200, 4.5f, static o => o.NumCasts > 0, "Left/Right Cleave")
-            .DeactivateOnExit<GravitationalWave>()
+            .ActivateOnEnter<DoubleTroubleTrapStacksGravitas>()
             .ActivateOnEnter<DoubleTroubleTrapKnockback>()
-            .ActivateOnEnter<DoubleTroubleTrapStacks>();
-        ComponentCondition<DoubleTroubleTrapKnockback>(id + 0x210, 3.8f, static o => o.NumCasts > 0, "Stacks + Knockbacks")
-            .DeactivateOnExit<DoubleTroubleTrapStacks>()
-            .DeactivateOnExit<DoubleTroubleTrapKnockback>();
+            .ExecOnEnter<DoubleTroubleTrapStacksGravitas>(static o => o.resolving = true);
+        ComponentCondition<DoubleTroubleTrapKnockback>(id + 0x210, 3.8f, static o => o.NumCasts == 2, "Stacks + Knockbacks")
+            .ExecOnExit<DoubleTroubleTrapStacks>(static o => o.resolving = false);
         Cast(id + 0x220, (uint)AID.LightOfJudgment, 9.2f, 5.0f, "Raidwide")
+            .DeactivateOnExit<DoubleTroubleTrapStacks>()
+            .DeactivateOnExit<DoubleTroubleTrapKnockback>()
+            .DeactivateOnExit<GravitationalWave>()
             .DeactivateOnExit<GravitasPuddles>()
             .ActivateOnEnter<LightOfJudgment>()
             .DeactivateOnExit<LightOfJudgment>()

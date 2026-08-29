@@ -1,11 +1,11 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStackSpread(module, 6.0f, 0.0f, 4, 4) {
+class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStackSpread(module, 6.0f, 0.0f, 4, 4) {
     // Used for when we are interested in showing the mechanic, not really needed since we can just use the base Active variable, but helps with
     // handling the state machine and keeping the DoubleTroubleTrap components together so it is clear what is happening
     public bool resolving = false;
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
-    private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
+    public readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
     public int NumCasts = 0;
 
     public override void OnStatusGain(Actor actor, ref ActorStatus status) {
@@ -50,26 +50,11 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
 
         base.DrawArenaForeground(pcSlot, pc);
 
-        if (!dmuConfig.P1DoubleTroubleKnockbackHints) {
+        if (!dmuConfig.P1DoubleTroubleKnockbackHints || dmuConfig.P1DoubleTrouble == DMUConfig.P1DoubleTroubleStrategy.DoubleTroubleNone) {
             return;
         }
 
-        WPos safeSpot = default;
-
-        if (IsStackTarget(pc)) {
-            safeSpot = P1DoubleTroubleKnockBackData.StackSafeSpots.GetValueOrDefault(pc.Role).stackDebuff;
-        }
-
-        if (!IsStackTarget(pc)) {
-            safeSpot = P1DoubleTroubleKnockBackData.StackSafeSpots.GetValueOrDefault(pc.Role).stackHelper;
-        }
-
-
-        if (safeSpot == default) {
-            return;
-        }
-
-        Arena.ZoneCircleOutline(safeSpot, PositionDrawSize.NORMAL, Colors.Safe, 2.0f);
+        drawForegroundHints(pcSlot, pc);
     }
 
     public override void AddHints(int slot, Actor actor, TextHints hints) {
@@ -82,6 +67,10 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
 
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
         if (!resolving || !Active) {
+            return;
+        }
+
+        if (dmuConfig.P1DoubleTrouble == DMUConfig.P1DoubleTroubleStrategy.DoubleTroubleNone) {
             return;
         }
 
@@ -110,6 +99,24 @@ sealed class DoubleTroubleTrapStacks(BossModule module) : Components.UniformStac
 
         return base.CalcPriority(pcSlot, pc, playerSlot, player, ref customColor);
     }
+
+    protected virtual void drawForegroundHints(int pcSlot, Actor pc) {
+        WPos safeSpot = default;
+
+        if (IsStackTarget(pc)) {
+            safeSpot = P1DoubleTroubleKnockBackData.StackSafeSpots.GetValueOrDefault(pc.Role).stackDebuff;
+        }
+
+        if (!IsStackTarget(pc)) {
+            safeSpot = P1DoubleTroubleKnockBackData.StackSafeSpots.GetValueOrDefault(pc.Role).stackHelper;
+        }
+
+        if (safeSpot == default) {
+            return;
+        }
+
+        Arena.ZoneCircleOutline(safeSpot, PositionDrawSize.NORMAL, Colors.Safe, 2.0f);
+    }
 }
 
 // Knockback with distance 6 is different to other knockbacks, so we have to clear the pending knockbacks after a set amount of time so the player
@@ -129,6 +136,7 @@ sealed class DoubleTroubleTrapKnockback(BossModule module) : Components.GenericK
             var target = Raid.FindSlot(spell.MainTargetID);
             activation = WorldState.CurrentTime.AddSeconds(knockbackResolveTimer);
             debuffPlayers.Set(target);
+            NumCasts++;
         }
     }
 

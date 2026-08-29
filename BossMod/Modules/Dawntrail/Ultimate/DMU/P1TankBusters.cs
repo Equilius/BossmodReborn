@@ -1,8 +1,5 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-// TODO consider redoing the AIHints for these components might be easier to give players goal zones instead of forbidden zones
-//  but can turn it into a forbidden zone later on once we know the bait timer, this way we dont have to block a ton of the map off for non tank roles
-
 static class NorthAIHints {
     private const float maxMelee = 2.5f;
 
@@ -23,13 +20,17 @@ static class NorthAIHints {
     }
 }
 
-sealed class RevoltingRuinIIIFirst(BossModule module) : Components.BaitAwayIcon(module, new AOEShapeCone(100.0f, 60.0f.Degrees()), (uint)IconID.TankBuster,
-    (uint)AID.RevoltingRuinIIIFirstHit, centerAtTarget: true, tankbuster: true, damageType: AIHints.PredictedDamageType.Tankbuster) {
+sealed class RevoltingRuinIIIFirst : Components.BaitAwayIcon {
     private readonly DMUConfig dmuConfig = Service.Config.Get<DMUConfig>();
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
 
+    public RevoltingRuinIIIFirst(BossModule module) : base(module, new AOEShapeCone(100.0f, 60.0f.Degrees()), (uint)IconID.TankBuster,
+        (uint)AID.RevoltingRuinIIIFirstHit, centerAtTarget: true, tankbuster: true, damageType: AIHints.PredictedDamageType.Tankbuster) {
+        EnableHints = false;
+    }
+
     public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
-        if (CurrentBaits.Count != 0) {
+        if (CurrentBaits.Count != 0 && EnableHints) {
             base.AddAIHints(slot, actor, assignment, hints);
         }
 
@@ -62,7 +63,6 @@ sealed class RevoltingRuinIIIFirst(BossModule module) : Components.BaitAwayIcon(
             return;
         }
 
-        // TODO refer to comment at the top of the class
         // This forbidden zone is always 2.0f so the pathfinder can see other current aoes that are active to avoid walking into them such as puddles
         hints.AddForbiddenZone(new SDDonutSector(Module.PrimaryActor.Position, 0.0f, 20.0f, Angle.AnglesCardinals[2], 90.0f.Degrees()),
             WorldState.FutureTime(2.0f));

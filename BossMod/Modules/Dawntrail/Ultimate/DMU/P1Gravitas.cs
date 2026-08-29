@@ -269,6 +269,12 @@ sealed class GravitasPuddles(BossModule module) : BossComponent(module) {
             return;
         }
 
+        // Once inverted, don't show hints until Knockback casts have gone off
+        var knockbacks = Module.FindComponent<DoubleTroubleTrapStacksGravitas>();
+        if (knockbacks != null && knockbacks.resolving && inverted) {
+            return;
+        }
+
         hints.AddForbiddenZone(inverted ? new SDInvertedUnion([.. shapes]) : new SDUnion([.. shapes]));
     }
 }
@@ -277,10 +283,21 @@ sealed class GravitationalWave(BossModule module) : Components.GenericAOEs(modul
     private readonly AOEShapeRect shape = new(40.0f, 20.0f);
     public readonly List<AOEInstance> aoes = [];
     public bool Risky = false;
+    public enum Sides { NONE, LEFT, RIGHT }
+    public Sides side = Sides.NONE;
 
     public override void OnActorEAnim(Actor actor, uint state) {
         if (state == (uint)Animations.PulseOrbStart) {
             aoes.Add(new(shape, Arena.Center.Quantized(), (actor.OID == (uint)OID.YellowOrb ? 1f : -1f) * 90.Degrees()));
+
+            if (actor.OID == (uint)OID.YellowOrb) {
+                side = Sides.LEFT;
+                return;
+            }
+
+            if (actor.OID == (uint)OID.PurpleOrb) {
+                side = Sides.RIGHT;
+            }
         }
     }
 
@@ -309,5 +326,174 @@ sealed class GravitationalWave(BossModule module) : Components.GenericAOEs(modul
     }
 }
 
-// TODO setup knockback AI for puddles as the safe voidzone part should become available after knockback has gone off
-//  Setup AI logic during Knockbacks - AIHints should become available after KB cast has happened for soaking - check the cast for it maybe
+sealed class DoubleTroubleTrapStacksGravitas : DoubleTroubleTrapStacks {
+    private readonly GravitationalWave? gravitationalWave;
+    private readonly record struct safeSpots(WPos front, WPos back);
+    private safeSpots? northSafeSpots;
+    private safeSpots? southSafeSpots;
+
+    public DoubleTroubleTrapStacksGravitas(BossModule module) : base(module) {
+        gravitationalWave = module.FindComponent<GravitationalWave>();
+    }
+
+    public override void DrawArenaForeground(int pcSlot, Actor pc) {
+        if (!resolving || !Active)
+            return;
+
+        base.DrawArenaForeground(pcSlot, pc);
+
+        if (!dmuConfig.P1DoubleTroubleKnockbackHints || dmuConfig.P1DoubleTrouble == DMUConfig.P1DoubleTroubleStrategy.DoubleTroubleNone) {
+            return;
+        }
+
+        drawForegroundHints(pcSlot, pc);
+    }
+
+    public override void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) {
+        if (!resolving || !Active) {
+            return;
+        }
+
+        if (dmuConfig.P1DoubleTrouble == DMUConfig.P1DoubleTroubleStrategy.DoubleTroubleNone) {
+            return;
+        }
+
+        if (northSafeSpots == null || southSafeSpots == null) {
+            setupSafeSpots();
+            return;
+        }
+
+        WPos safeSpot = default;
+        DateTime activation = Stacks[0].Activation;
+
+        if (IsStackTarget(actor)) {
+            if (actor.Class.IsSupport()) {
+                safeSpot = northSafeSpots.Value.back;
+            }
+
+            if (actor.Class.IsDD()) {
+                safeSpot = southSafeSpots.Value.back;
+            }
+        }
+
+        if (!IsStackTarget(actor)) {
+            if (actor.Class.IsSupport()) {
+                safeSpot = northSafeSpots.Value.front;
+            }
+
+            if (actor.Class.IsDD()) {
+                safeSpot = southSafeSpots.Value.front;
+            }
+        }
+
+        if (safeSpot == default) {
+            return;
+        }
+
+        hints.AddForbiddenZone(new SDInvertedCircle(safeSpot, PositionAIRadius.PRECISE), activation);
+    }
+
+    // Creates the safe spot hints of where people should stand to resolve the knockbacks. Caches the safe spots since it's a lot of working out that
+    // only needs to run once.
+    private void setupSafeSpots() {
+        if (gravitationalWave == null || gravitationalWave.side == GravitationalWave.Sides.NONE) {
+            return;
+        }
+        var side = gravitationalWave.side;
+
+        var puddleActors = Module.Enemies((uint)OID.PurplePuddles);
+        if (puddleActors.Count == 0) {
+            return;
+        }
+
+        // Split puddles into north and south
+        var northPuddles = new List<Actor>();
+        var southPuddles = new List<Actor>();
+        foreach (var puddle in puddleActors) {
+            if (puddle.Position.Z < Module.Center.Z) {
+                northPuddles.Add(puddle);
+            } else {
+                southPuddles.Add(puddle);
+            }
+        }
+
+        const float puddleRadius = 5.0f;
+        const float puddleDistance = 2.0f; // Distance we want to be away from the puddle
+        const float backDistance = 1.5f; // Distance to put between the front safe spot & the back safe spot
+        const float backTowardsPuddle = 2.0f; // Distance the back puddle goes towards the puddle to create the KB angle for people in front
+
+        foreach (var puddles in new[] { northPuddles, southPuddles }) {
+            if (puddles.Count == 0) {
+                continue;
+            }
+
+            // Midpoint of the puddles for that zone since the puddles can be slightly off from each since they're placed by players
+            var sum = new WDir();
+            foreach (var puddle in puddles) {
+                sum = sum + puddle.Position - Arena.Center;
+            }
+            var puddleCenter = Arena.Center + sum / puddles.Count;
+
+            var toCenter = Angle.FromDirection(Arena.Center - puddleCenter);
+            var directionClockwise = (toCenter + 45.0f.Degrees()).ToDirection();
+            var directionCounterClockwise = (toCenter - 45.0f.Degrees()).ToDirection();
+            var isEast = side == GravitationalWave.Sides.RIGHT;
+            var frontDirection = directionClockwise.X >= directionCounterClockwise.X == isEast ? directionClockwise : directionCounterClockwise;
+
+            // Looks at the frontDirection and if the puddle is too close, it will move it along a bit more that direction to avoid the puddle
+            var spread = 0.0f;
+            foreach (var puddle in puddles) {
+                var reach = (puddle.Position - puddleCenter).Dot(frontDirection);
+                if (reach > spread) {
+                    spread = reach;
+                }
+            }
+
+            var frontSafeSpot = puddleCenter + frontDirection * (spread + puddleRadius + puddleDistance);
+            var backDirection = (frontSafeSpot - Arena.Center).Normalized();
+            var puddleDirection = (puddleCenter - frontSafeSpot).Normalized();
+            var backSafeSpot = frontSafeSpot + backDirection * (2 * backDistance) + puddleDirection * backTowardsPuddle;
+
+            if (puddles == northPuddles) {
+                northSafeSpots = new safeSpots(frontSafeSpot, backSafeSpot);
+            } else {
+                southSafeSpots = new safeSpots(frontSafeSpot, backSafeSpot);
+            }
+        }
+    }
+
+    protected override void drawForegroundHints(int pcSlot, Actor pc) {
+        if (northSafeSpots == null || southSafeSpots == null) {
+            setupSafeSpots();
+            return;
+        }
+
+        WPos safeSpot = default;
+
+        if (IsStackTarget(pc)) {
+            if (pc.Class.IsSupport()) {
+                safeSpot = northSafeSpots.Value.back;
+            }
+
+            if (pc.Class.IsDD()) {
+                safeSpot = southSafeSpots.Value.back;
+            }
+        }
+
+        if (!IsStackTarget(pc)) {
+            if (pc.Class.IsSupport()) {
+                safeSpot = northSafeSpots.Value.front;
+            }
+
+            if (pc.Class.IsDD()) {
+                safeSpot = southSafeSpots.Value.front;
+            }
+        }
+
+        if (safeSpot == default) {
+            return;
+        }
+
+        Arena.ZoneCircleOutline(safeSpot, PositionDrawSize.NORMAL, Colors.Safe, 2.0f);
+    }
+}

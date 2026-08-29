@@ -27,7 +27,18 @@ public sealed class DMUConfig : ConfigNode {
     [PropertyDisplay("P1 Wave Cannon safe spot hints", tooltip: "Will display roughly where to stand for your bait")]
     public bool P1WaveCannonHints = false;
 
-    [PropertyDisplay("P1 DoubleTrouble Knockback safe spot hints", tooltip: "Will display roughly where to stand for the stack")]
+    public enum P1DoubleTroubleStrategy {
+        [PropertyDisplay("None")]
+        DoubleTroubleNone,
+
+        [PropertyDisplay("LPDU")]
+        DoubleTroubleLPDU
+    }
+
+    [PropertyDisplay("P1 DoubleTrouble strategy")]
+    public P1DoubleTroubleStrategy P1DoubleTrouble = P1DoubleTroubleStrategy.DoubleTroubleNone;
+
+    [PropertyDisplay("P1 DoubleTrouble Knockback safe spot hints", tooltip: "Will display roughly where to stand for the stack, but you may still need to adjust")]
     public bool P1DoubleTroubleKnockbackHints = false;
 
     public enum P1GravenImage2Strategy {
