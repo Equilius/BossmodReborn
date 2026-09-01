@@ -751,14 +751,17 @@ sealed class DMUStates : StateMachineBuilder
             .ExecOnEnter<DoubleTroubleTrapStacksGravitas>(static o => o.resolving = true);
         ComponentCondition<DoubleTroubleTrapKnockback>(id + 0x210, 3.8f, static o => o.NumCasts == 2, "Stacks + Knockbacks")
             .ExecOnExit<DoubleTroubleTrapStacks>(static o => o.resolving = false);
-        Cast(id + 0x220, (uint)AID.LightOfJudgment, 9.2f, 5.0f, "Raidwide")
+
+        ComponentCondition<GravitasPuddles>(id + 0x215, 3.0f, static o => o.puddles.Count == 0, "Puddle explosions")
             .DeactivateOnExit<DoubleTroubleTrapStacks>()
             .DeactivateOnExit<DoubleTroubleTrapKnockback>()
             .DeactivateOnExit<GravitationalWave>()
             .DeactivateOnExit<GravitasPuddles>()
+            .ActivateOnExit<HyperDrive>(); // Activated early for pre-position movement
+
+        Cast(id + 0x220, (uint)AID.LightOfJudgment, 6.5f, 5.0f, "Raidwide")
             .ActivateOnEnter<LightOfJudgment>()
-            .DeactivateOnExit<LightOfJudgment>()
-            .ActivateOnEnter<HyperDrive>();
+            .DeactivateOnExit<LightOfJudgment>();
         ComponentCondition<HyperDrive>(id + 0x215, 3.2f, static o => o.NumCasts > 0, "1st Tankbuster");
         ComponentCondition<HyperDrive>(id + 0x220, 2.1f, static o => o.NumCasts > 1, "2nd Tankbuster");
         ComponentCondition<HyperDrive>(id + 0x225, 2.1f, static o => o.NumCasts > 2, "3rd Tankbuster")
@@ -771,7 +774,6 @@ sealed class DMUStates : StateMachineBuilder
             .ActivateOnEnter<TeleTrouncing>();
         ComponentCondition<TeleTrouncing>(id + 0x240, 7.8f, static o => o.NumCasts > 0, "First Arrows");
         ComponentCondition<TeleTrouncing>(id + 0x250, 3.0f, static o => o.NumCasts > 9, "Second Arrows")
-            .DeactivateOnExit<TeleTrouncing>()
             .ActivateOnExit<DoubleTroubleTrapKnockback>()
             .ActivateOnExit<DoubleTroubleTrapStacks>();
         ComponentCondition<DoubleTroubleTrapKnockback>(id + 0x260, 5.4f, static o => o.NumCasts > 0, "Stacks + Knockbacks")
@@ -780,7 +782,8 @@ sealed class DMUStates : StateMachineBuilder
             .ActivateOnExit<GravenImage3>();
         ComponentCondition<GravenImage3>(id + 0x270, 5.6f, static o => !o.Active, "Sleeps + Confusion Spreads")
             .DeactivateOnExit<GravenImage3>()
-            .ActivateOnExit<Gaze>();
+            .ActivateOnExit<Gaze>()
+            .DeactivateOnExit<TeleTrouncing>();
 
         CastStart(id + 0x280, (uint)AID.MysteryMagic, 7.9f)
             .ActivateOnEnter<LightningSafeSpots>()

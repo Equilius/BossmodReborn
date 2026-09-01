@@ -200,7 +200,7 @@ sealed class Gravitas(BossModule module) : Components.UniformStackSpread(module,
 // Puddles are voidzones, but custom component is needed to make them disappear when they're actually soaked instead of using eventState != 7 or isDead
 sealed class GravitasPuddles(BossModule module) : BossComponent(module) {
     private readonly AOEShapeCircle shape = new(5.0f);
-    private readonly List<Actor> puddles = [];
+    public readonly List<Actor> puddles = [];
     private bool inverted = false;
 
     public override void OnActorCreated(Actor actor) {
@@ -390,7 +390,7 @@ sealed class DoubleTroubleTrapStacksGravitas : DoubleTroubleTrapStacks {
             return;
         }
 
-        hints.AddForbiddenZone(new SDInvertedCircle(safeSpot, PositionAIRadius.PRECISE), activation);
+        hints.AddForbiddenZone(new SDInvertedCircle(safeSpot, PositionAIRadius.SUPER_PRECISE), activation);
     }
 
     // Creates the safe spot hints of where people should stand to resolve the knockbacks. Caches the safe spots since it's a lot of working out that

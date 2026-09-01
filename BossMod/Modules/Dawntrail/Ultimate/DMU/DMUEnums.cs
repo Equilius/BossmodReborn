@@ -16,7 +16,7 @@ public enum OID : uint {
     Exit = 0x1E850B, // R0.500, x1, EventObj type
     YellowOrb = 0x1EBFBD, // R0.500, x2, EventObj type // Yellow orb
     PurpleOrb = 0x1EBFBC, // R0.500, x2, EventObj type // Purple orb
-    Actor1ec023 = 0x1EC023, // R0.500, x0 (spawn during fight), EventObj type
+    TeleTrouncingArrow = 0x1EC023, // R0.500, x0 (spawn during fight), EventObj type
 
     // Phase 2
     BossP2 = 0x4C32,
@@ -81,17 +81,14 @@ public enum AID : uint {
     LightOfJudgment = 50722, // Kefka->self, 5.0s cast, range 100 circle
     Hyperdrive = 49739, // Kefka->player, no cast, range 5 circle
 
-    // TODO
-
-
-
-
     Gravitas = 47788, // 4C31->player, no cast, range 5 circle - Purple puddle - Stack
     Vitrophyre = 47792, // _Gen_GravenImage->players, no cast, range 5 circle - Rock - Spread
     GravityIII = 47791, // Helper->self, no cast, range 5 circle
     GravitationalExplosion = 47789, // Helper->self, no cast, range 100 circle
     GravitationalWave = 47793, // 4C31->self, no cast, range 100 ?-degree cone - Purple left side
     IntemperateWill = 47794, // _Gen_GravenImage->self, no cast, range 100 ?-degree cone - Yellow right side
+
+    // TODO
 
     TeleTrouncing = 47801, // Kefka->self, 5.0s cast, single-target
     TeleTrouncing1 = 47802, // Helper->players, no cast, range 2 circle

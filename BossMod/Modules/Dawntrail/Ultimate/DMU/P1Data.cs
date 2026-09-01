@@ -14,6 +14,7 @@ public static class PositionDrawSize {
 
 // Used for the radius the player can stand around that point given
 public static class PositionAIRadius {
+    public const float SUPER_PRECISE = 0.75f;
     public const float PRECISE = 1.0f;
     public const float SEMI_PRECISE = 1.5f;
     public const float NORMAL = 2.0f;
@@ -79,7 +80,7 @@ public class P1DoubleTroubleKnockBackData {
 }
 
 public class P1GravitasData {
-    public enum Side { NONE, NORTH, SOUTH }
+    public enum Side { NONE, NORTH, SOUTH } // TODO move to component class?
 
     public static IReadOnlyDictionary<Side, WPos> PuddlesSpots => puddleSpots;
     public static IReadOnlyDictionary<PartyRolesConfig.Assignment, (WPos north, WPos south)> SpreadSafeSpots => spreadSafeSpots;
@@ -98,5 +99,49 @@ public class P1GravitasData {
         [PartyRolesConfig.Assignment.H1] = (new WPos(113.500f, 87.500f), new WPos(86.500f, 112.500f)),
         [PartyRolesConfig.Assignment.R2] = (new WPos(86.500f, 87.500f), new WPos(113.500f, 112.500f)),
         [PartyRolesConfig.Assignment.H2] = (new WPos(86.500f, 87.500f), new WPos(113.500f, 112.500f)),
+    };
+}
+
+public class P1TeleTrouncingData {
+    public enum Direction { NONE, UP, DOWN, LEFT, RIGHT }
+    public readonly record struct arrowSpot(Direction direction, WPos safeSpot);
+    public readonly record struct arrowPair(arrowSpot arrow1, arrowSpot arrow2);
+    private static (Direction, Direction) Normalize(Direction a, Direction b) => a <= b ? (a, b) : (b, a);
+
+    public static bool TryGetSafeSpots(DMUConfig.P1TeleTrouncingStrategy strategy, Direction a, Direction b, out arrowPair pair) {
+        var strategyPicked = strategy switch {
+            DMUConfig.P1TeleTrouncingStrategy.Freaky_Arrow => freakyArrowSafeSpots,
+            DMUConfig.P1TeleTrouncingStrategy.Modified_Xolo => modifiedXoloSafeSpots,
+            _ => null
+        };
+
+        if (strategyPicked == null) {
+            pair = default;
+            return false;
+        }
+
+        return strategyPicked.TryGetValue(Normalize(a, b), out pair);
+    }
+
+    private static readonly Dictionary<(Direction, Direction), arrowPair> freakyArrowSafeSpots = new() {
+        [Normalize(Direction.DOWN, Direction.DOWN)] = new(new(Direction.DOWN, new WPos(112.000f, 94.000f)), new(Direction.DOWN, new WPos(112.000f, 100.000f))),
+        [Normalize(Direction.LEFT, Direction.LEFT)] = new(new(Direction.LEFT, new WPos(106.000f, 112.000f)), new(Direction.LEFT, new WPos(100.000f, 112.000f))),
+        [Normalize(Direction.UP, Direction.UP)] = new(new(Direction.UP, new WPos(88.000f, 106.000f)), new(Direction.UP, new WPos(88.000f, 100.000f))),
+        [Normalize(Direction.RIGHT, Direction.RIGHT)] = new(new(Direction.RIGHT, new WPos(94.000f, 88.000f)), new(Direction.RIGHT, new WPos(100.000f, 88.000f))),
+        [Normalize(Direction.UP, Direction.LEFT)] = new(new(Direction.UP, new WPos(88.000f, 112.000f)), new(Direction.LEFT, new WPos(94.000f, 112.000f))),
+        [Normalize(Direction.UP, Direction.RIGHT)] = new(new(Direction.UP, new WPos(88.000f, 94.000f)), new(Direction.RIGHT, new WPos(88.000f, 88.000f))),
+        [Normalize(Direction.DOWN, Direction.RIGHT)] = new(new(Direction.DOWN, new WPos(112.000f, 88.000f)), new(Direction.RIGHT, new WPos(106.000f, 88.000f))),
+        [Normalize(Direction.DOWN, Direction.LEFT)] = new(new(Direction.DOWN, new WPos(112.000f, 106.000f)), new(Direction.LEFT, new WPos(112.000f, 112.000f))),
+    };
+
+    private static readonly Dictionary<(Direction, Direction), arrowPair> modifiedXoloSafeSpots = new() {
+        [Normalize(Direction.DOWN, Direction.DOWN)] = new(new(Direction.DOWN, new WPos(87.750f, 88.030f)), new(Direction.DOWN, new WPos(87.750f, 93.570f))),
+        [Normalize(Direction.LEFT, Direction.LEFT)] = new(new(Direction.LEFT, new WPos(112.135f, 87.993f)), new(Direction.LEFT, new WPos(106.579f, 87.922f))),
+        [Normalize(Direction.UP, Direction.UP)] = new(new(Direction.UP, new WPos(111.989f, 112.003f)), new(Direction.UP, new WPos(112.125f, 106.306f))),
+        [Normalize(Direction.RIGHT, Direction.RIGHT)] = new(new(Direction.RIGHT, new WPos(88.069f, 112.037f)), new(Direction.RIGHT, new WPos(93.798f, 112.161f))),
+        [Normalize(Direction.UP, Direction.LEFT)] = new(new(Direction.UP, new WPos(93.781f, 93.593f)), new(Direction.LEFT, new WPos(93.576f, 88.051f))),
+        [Normalize(Direction.UP, Direction.RIGHT)] = new(new(Direction.UP, new WPos(111.955f, 93.877f)), new(Direction.RIGHT, new WPos(106.422f, 93.756f))),
+        [Normalize(Direction.DOWN, Direction.RIGHT)] = new(new(Direction.DOWN, new WPos(106.413f, 106.444f)), new(Direction.RIGHT, new WPos(106.337f, 112.135f))),
+        [Normalize(Direction.DOWN, Direction.LEFT)] = new(new(Direction.DOWN, new WPos(88.103f, 106.377f)), new(Direction.LEFT, new WPos(93.685f, 106.316f))),
     };
 }

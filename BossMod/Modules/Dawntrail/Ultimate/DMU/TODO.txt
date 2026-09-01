@@ -9,10 +9,6 @@ General (for all phases / multiple phases)
     but lightning could also be refactored, this is for P1 & P4, p4 had extra logic for the fake & truth part, but turns out none of it is needed
     Be careful when changing lightning tho as it is used by gazes as well
 
-Phase 1:
-- P1 arrow puddles with arrows
-- TeleTrouncing - add support to allow different points of views for different players in the replay - need to use pcSlot and slot of the raid members
-
 Phase 2:
 - If forsaken is reamde
     - Ensure to store the order of towers in a list that can be used by other methods like AllThingsEnding, so it doesn't require
