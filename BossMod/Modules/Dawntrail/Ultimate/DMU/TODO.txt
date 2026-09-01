@@ -1,15 +1,13 @@
-﻿General (for all phases / multiple phases)
+﻿1. add line in-game hints like m11s - where it displays a line where to move in-game instead of on the radar
+2. Go over phases, if there are stuff like if resolved or true statement, can just set it inside the state machine instead for easier control 
+------------------------------
+
+General (for all phases / multiple phases)
 - Activation times for spells
 - Timeline improvements
 - Turns out we only need to know some of the casts going off for blizzrd and lightning, blizzard has already been refactored
     but lightning could also be refactored, this is for P1 & P4, p4 had extra logic for the fake & truth part, but turns out none of it is needed
     Be careful when changing lightning tho as it is used by gazes as well
-
-Phase 1:
-- Graven Image 1 safe spots
-- WaveCannonTowers Priority order
-- P1 arrow puddles with arrows
-- TeleTrouncing - add support to allow different points of views for different players in the replay - need to use pcSlot and slot of the raid members
 
 Phase 2:
 - If forsaken is reamde
