@@ -78,8 +78,7 @@ public class Cleave(BossModule module, uint aid, AOEShape shape, uint[]? enemyOI
         {
             var a = raid[i];
             // A lot of mechanics don't care if the pet is hit or not, e.g. even if the pet is inside the bait it doesn't do anything to them
-            // Also check to ensure the pet isn't dead (swapping pets will make them stay there for like 2 seconds)
-            if (!AllowPetTargets && a.Type == ActorType.Pet && !a.IsDead)
+            if (!AllowPetTargets && a.Type == ActorType.Pet)
             {
                 continue;
             }
