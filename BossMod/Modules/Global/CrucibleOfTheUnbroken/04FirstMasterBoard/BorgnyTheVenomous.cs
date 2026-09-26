@@ -73,7 +73,11 @@ sealed class ToxicBreathBoss(BossModule module) : Components.GenericAOEs(module)
     }
 }
 
-sealed class ToxicVomit(BossModule module) : Components.BaitAwayIcon(module, 6f, (uint)IconID.ToxicVomitIcon) {
+sealed class ToxicVomit : Components.BaitAwayIcon {
+    public ToxicVomit(BossModule module) : base(module, 6f, (uint)IconID.ToxicVomitIcon) {
+        AllowPetTargets = true; // The pet doesn't take any damage from these, but it fixes the problem of the player blocking themselves in under the boss
+    }
+
     public override void OnEventCast(Actor caster, ActorCastEvent spell) {
         if (spell.Action.ID is (uint)AID.ToxicVomitBoss or (uint)AID.ToxicVomit) {
             NumCasts++;
