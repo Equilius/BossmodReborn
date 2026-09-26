@@ -77,16 +77,17 @@ public class Cleave(BossModule module, uint aid, AOEShape shape, uint[]? enemyOI
         for (var i = 0; i < len; ++i)
         {
             var a = raid[i];
+            if (a == actor)
+            {
+                continue;
+            }
+
             // A lot of mechanics don't care if the pet is hit or not, e.g. even if the pet is inside the bait it doesn't do anything to them
             if (!AllowPetTargets && a.Type == ActorType.Pet)
             {
                 continue;
             }
 
-            if (a == actor)
-            {
-                continue;
-            }
             if (!ArenaProjectionLayerParticipantApplies(a, ArenaProjectionLayer, RestrictToArenaProjectionLayer))
             {
                 continue;
@@ -128,23 +129,28 @@ public class Cleave(BossModule module, uint aid, AOEShape shape, uint[]? enemyOI
         }
     }
 
-    private sealed class ExpandedBaitZone(ShapeDistance inner, float radius) : ShapeDistance {
+    private sealed class ExpandedBaitZone(ShapeDistance inner, float radius) : ShapeDistance
+    {
         public override float Distance(in WPos p) => inner.Distance(p) - radius;
     }
 
-    private static ShapeDistance BaitAimZone(WPos source, Angle direction, Angle halfAngle, float zoneRadius) {
+    private static ShapeDistance BaitAimZone(WPos source, Angle direction, Angle halfAngle, float zoneRadius)
+    {
         return halfAngle.Rad >= MathF.PI ? new SDCircle(source, zoneRadius) : new SDCone(source, zoneRadius, direction, halfAngle);
     }
 
     // Angular interval in which a circular hitbox intersects a forward, infinitely long rectangle
-    private static Angle RectBaitHalfAngle(float distance, float halfWidth, float radius) {
+    private static Angle RectBaitHalfAngle(float distance, float halfWidth, float radius)
+    {
         // The party member (pet, since players count as a point) overlaps the source: changing aim cannot avoid it
-        if (distance <= radius) {
+        if (distance <= radius)
+        {
             return new Angle(MathF.PI);
         }
 
         // Normal case: contact is against one of the rectangle's long sides
-        if (distance >= halfWidth + radius) {
+        if (distance >= halfWidth + radius)
+        {
             return Angle.Asin(Math.Clamp((halfWidth + radius) / distance, 0f, 1f));
         }
 
@@ -154,7 +160,8 @@ public class Cleave(BossModule module, uint aid, AOEShape shape, uint[]? enemyOI
         var rightAngle = new Angle(Angle.HalfPi);
 
         // Close to the source: contact is against the rectangle's rear face
-        if (distanceSq <= widthSq + radiusSq) {
+        if (distanceSq <= widthSq + radiusSq)
+        {
             return rightAngle + Angle.Asin(Math.Clamp(radius / distance, 0f, 1f));
         }
 
