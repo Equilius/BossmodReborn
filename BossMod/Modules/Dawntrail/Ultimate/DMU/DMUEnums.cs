@@ -1,12 +1,13 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
-public enum OID : uint
-{
+public enum OID : uint {
     // Phase 1
     Kefka = 0x4C30, // R6.000, x1
     Helper = 0x233C, // R0.500, x37, Helper type
     GravenImage = 0x4C31, // R0.500, x9
-    StatueBodyOrb = 0x1EBFBB, // R0.500, x2, EventObj type
+    StatueWaveCannon = 0x1EBFBB, // R0.500, x2, EventObj type
+
+    // TODO OLD
     PurplePuddles = 0x1EC022, // R0.500, x0 (spawn during fight), EventObj type
     StatuePurpleEye = 0x1EBFBE, // R0.500, x2, EventObj type // Purple eye for sleep
     StatueYellowEye = 0x1EBFBF, // R0.500, x2, EventObj type // Yellow eye for confusion
@@ -15,7 +16,7 @@ public enum OID : uint
     Exit = 0x1E850B, // R0.500, x1, EventObj type
     YellowOrb = 0x1EBFBD, // R0.500, x2, EventObj type // Yellow orb
     PurpleOrb = 0x1EBFBC, // R0.500, x2, EventObj type // Purple orb
-    Actor1ec023 = 0x1EC023, // R0.500, x0 (spawn during fight), EventObj type
+    TeleTrouncingArrow = 0x1EC023, // R0.500, x0 (spawn during fight), EventObj type
 
     // Phase 2
     BossP2 = 0x4C32,
@@ -47,35 +48,35 @@ public enum OID : uint
     FireTower = 0x1EC03E, // R0.500, x0 (spawn during fight), EventObj type
 }
 
-public enum AID : uint
-{
+public enum AID : uint {
     // Phase 1
-    AutoAttack = 49746, // Kefka->player, no cast, single-target
-    Ability = 50173, // Kefka->location, no cast, single-target
+    P1AutoAttack = 49746, // Kefka->player, no cast, single-target
+    P1Teleport = 50173, // Kefka->location, no cast, single-target
 
-    RevoltingRuinIII = 50179, // Kefka->self/players, 5.0s cast, range 100 ?-degree cone
-    RevoltingRuinIII1 = 50401, // Kefka->self, no cast, range 100 ?-degree cone
+    RevoltingRuinIIIFirstHit = 50179, // Kefka->self/players, 5.0s cast, range 100 150-degree cone
+    RevoltingRuinIIISecondHit = 50401, // Kefka->self, no cast, range 100 150-degree cone
 
     GravenImage = 48370, // Kefka->self, 3.0s cast, single-target
     PulseWave = 47785, // 4C31->player, no cast, single-target
-    BlizzardIIIBlowout = 47774, // Helper->self, 5.0s cast, range 40 ?-degree cone
-    BlizzardIIIBlowout1 = 47771, // Helper->self, 5.0s cast, range 40 ?-degree cone - Fake it does nothing
-    BlizzardIIIBlowout2 = 47768, // Helper->self, 5.0s cast, range 40 ?-degree cone
-    BlizzardIIIBlowout3 = 47765, // Kefka->self, 5.0s cast, single-target - Not needed it seems
+
     MysteryMagic = 47764, // Kefka->self, 5.0s cast, single-target
-    FlagrantFireIIIStack = 47779, // Helper->players, no cast, range 6 circle - Stack
+    BlizzardIIIBlowoutBoss = 47765, // Kefka->self, 5.0s cast, single-target
+    BlizzardIIIBlowoutFake = 47771, // Helper->self, 5.0s cast, range 40 90-degree cone - does no damage
+    BlizzardIIIBlowout = 47774, // Helper->self, 5.0s cast, range 40 90-degree cone
+    BlizzardIIIBlowout1 = 47768, // Helper->self, 5.0s cast, range 40 90-degree cone
+    FlagrantFireIIIStack = 47779, // Helper->players, no cast, range 6 circle
     FlagrantFireIIISpread = 47778, // Helper->players, no cast, range 5 circle
 
     WaveCannon = 47784, // 4C31->self, no cast, range 100 width 6 rect
     TowerExplosion = 47786, // Helper->self, 3.0s cast, range 4 circle
-    UnmitigatedExplosion = 47787, // Helper->self, no cast, range 100 circle - AOE if tower is missed, we don't care about this
+    UnmitigatedExplosion = 47787, // Helper->self, no cast, range 100 circle
 
     DoubleTroubleTrap = 47782, // Kefka->self, 3.0s cast, single-target
-    DoubleTroubleTrap1 = 47783, // Helper->player, no cast, range 6 circle
+    DoubleTroubleTrapStack = 47783, // Helper->player, no cast, range 6 circle
 
     ThrummingThunderIII = 47775, // Helper->self, 5.0s cast, range 40 width 10 rect
-    ThrummingThunderIII1 = 47776, // Helper->self, 5.0s cast, range 40 width 10 rect
-    ThrummingThunderIII2 = 47777, // Helper->self, 5.0s cast, range 40 width 10 rect
+    ThrummingThunderIII1 = 47777, // Helper->self, 5.0s cast, range 40 width 10 rect
+    ThrummingThunderIIIFake = 47776, // Helper->self, 5.0s cast, range 40 width 10 rect
 
     LightOfJudgment = 50722, // Kefka->self, 5.0s cast, range 100 circle
     Hyperdrive = 49739, // Kefka->player, no cast, range 5 circle
@@ -86,6 +87,8 @@ public enum AID : uint
     GravitationalExplosion = 47789, // Helper->self, no cast, range 100 circle
     GravitationalWave = 47793, // 4C31->self, no cast, range 100 ?-degree cone - Purple left side
     IntemperateWill = 47794, // _Gen_GravenImage->self, no cast, range 100 ?-degree cone - Yellow right side
+
+    // TODO
 
     TeleTrouncing = 47801, // Kefka->self, 5.0s cast, single-target
     TeleTrouncing1 = 47802, // Helper->players, no cast, range 2 circle
@@ -365,18 +368,19 @@ public enum SID : uint
     LightningResistanceDownII = 2998, // Helper->player, extra=0x0 - Used for TB in other phases as well
 }
 
-public enum IconID : uint
-{
+public enum IconID : uint {
     // Phase 1
-    TankIcon = 218, // player->self
-    spreadIcon = 127, // player->self // Spread
-    stackIcon = 128, // player->self // Stack
-    FireRingQuestionMark = 673, // Kefka->self // Questionmark - 2A1
-    FireRingBlueOrb = 674, // Kefka->self // Blue orb - 2A2
-    BlueRingQuestionMark = 675, // Kefka->self // Questionmark - 2A3
-    BlueRingBlueOrb = 676, // Kefka->self // Blue orb - 2A4
-    PurpleRingQuestionMark = 677, // Kefka->self // Questionmark
-    PurpleRingBlueOrb = 678, // Kefka->self // Blue orb
+    TankBuster = 218, // player->self
+    P1SpreadIcon = 127, // player->self
+    P1StackIcon = 128, // player->self
+    FireRingQuestionMark = 673, // Kefka->self
+    FireRingBlueOrb = 674, // Kefka->self
+    BlueRingQuestionMark = 675, // Kefka->self
+    BlueRingBlueOrb = 676, // Kefka->self
+    PurpleRingQuestionMark = 677, // Kefka->self
+    PurpleRingBlueOrb = 678, // Kefka->self
+
+    // TODO OLD
 
     // Phase 2
     SharedTankBuster = 259, // player->self
@@ -417,10 +421,11 @@ public enum Animations : uint
     TowerExplosion = 0x10040,
 }
 
-public enum TetherID : uint
-{
+public enum TetherID : uint {
     // Phase 1
     GravenImageTether = 45, // 4C31->player
+
+    // TODO OLD
 
     // Phase 3
     BlackHoleTether = 84, // 4C38->player
