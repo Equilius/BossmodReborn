@@ -1,11 +1,10 @@
-﻿using BossMod.Autorotation.xan;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
+﻿using FFXIVClientStructs.FFXIV.Client.Game.Object;
 
 namespace BossMod.Autorotation.MiscAI;
 
 public sealed class AutoTarget(RotationModuleManager manager, Actor player) : RotationModule(manager, player)
 {
-    public enum Track { General, Retarget, QuestBattle, DeepDungeon, EpicEcho, Hunt, FATE, TreasureHunt, Everything, CollectFATE, Treasure, MaxTargets, Zodiac }
+    public enum Track { General, Retarget, QuestBattle, DeepDungeon, EpicEcho, Hunt, FATE, TreasureHunt, Everything, CollectFATE, Treasure, MaxTargets, Zodiac, Foray }
     public enum GeneralStrategy { Aggressive, Passive }
     public enum RetargetStrategy { NoTarget, Hostiles, Always, Never }
     public enum Flag { Disabled, Enabled }
@@ -56,7 +55,7 @@ public sealed class AutoTarget(RotationModuleManager manager, Actor player) : Ro
             .AddOption(Flag.Disabled)
             .AddOption(Flag.Enabled);
 
-        res.Define(Track.Treasure).As<Flag>("Treasure", "Open treasure chests", renderer: typeof(DefaultOffRenderer))
+        res.Define(Track.Treasure).As<Flag>("Treasure", "Open treasure chests", renderer: typeof(DefaultOffRenderer), uiPriority: -115)
             .AddOption(Flag.Disabled)
             .AddOption(Flag.Enabled);
 
@@ -65,7 +64,40 @@ public sealed class AutoTarget(RotationModuleManager manager, Actor player) : Ro
         res.Define(Track.Zodiac).As<Flag>("Zodiac", "Prioritize mobs in the current Zodiac Book", renderer: typeof(DefaultOffRenderer), uiPriority: -95)
             .AddOption(Flag.Disabled)
             .AddOption(Flag.Enabled);
+
+        res.Define(Track.Foray).As<Flag>("Foray", "Prioritize Foray module targets (eg. Bozja, Occult Crescent)", renderer: typeof(DefaultOffRenderer), uiPriority: -105)
+            .AddOption(Flag.Disabled)
+            .AddOption(Flag.Enabled);
         return res;
+    }
+
+    // all targets closer than this many units to the player are considered to have the same priority
+    // we use "is this the player's current target?" as a tiebreaker
+    // due to the way goalzones work for jobs with weirdly shaped AOEs (cone, rect, etc), AI tends to move closer to a mob that isn't its primary target, and without a threshold, that results in switching target rapidly (sometimes every frame)
+    public const float MinPriorityDistance = 3;
+
+    record struct TargetKey(bool ShouldTarget, int Priority, float InvDistance, bool IsCurrentTarget) : IComparable<TargetKey>
+    {
+        public readonly int CompareTo(TargetKey other)
+        {
+            if (ShouldTarget.CompareTo(other.ShouldTarget) is var i && i != 0)
+                return i;
+            if (Priority.CompareTo(other.Priority) is var j && j != 0)
+                return j;
+            if (InvDistance.CompareTo(other.InvDistance) is var k && k != 0)
+                return k;
+            return IsCurrentTarget.CompareTo(other.IsCurrentTarget);
+        }
+
+        public static TargetKey Create(AIHints.Enemy enemy, Actor player)
+        {
+            return new(enemy.ShouldBeTargeted, enemy.Priority, -Math.Max(MinPriorityDistance, player.DistanceToHitbox(enemy.Actor)), player.TargetID == enemy.Actor.InstanceID);
+        }
+
+        public static bool operator <(TargetKey left, TargetKey right) => left.CompareTo(right) < 0;
+        public static bool operator <=(TargetKey left, TargetKey right) => left.CompareTo(right) <= 0;
+        public static bool operator >(TargetKey left, TargetKey right) => left.CompareTo(right) > 0;
+        public static bool operator >=(TargetKey left, TargetKey right) => left.CompareTo(right) >= 0;
     }
 
     public override void Execute(StrategyValues strategy, Actor? primaryTarget, float estimatedAnimLockDelay, bool isMoving)
@@ -81,13 +113,15 @@ public sealed class AutoTarget(RotationModuleManager manager, Actor player) : Ro
         var maxTargets = strategy.GetInt(Track.MaxTargets);
         var canPullMore = maxTargets == 0 || World.Actors.Count(a => a.AggroPlayer && !a.IsDead) < maxTargets;
 
+        var currentTargetId = primaryTarget?.InstanceID ?? 0;
+
         Actor? bestTarget = null; // non-null if we bump any priorities
-        (bool, int, float) bestTargetKey = (false, 0, float.MinValue); // "force target" flag, priority, and negated squared distance
+        var bestTargetKey = new TargetKey(false, 0, float.MinValue, false);
         void prioritize(AIHints.Enemy e, int prio)
         {
             e.Priority = prio;
 
-            var key = (e.ShouldBeTargeted, e.Priority, -(e.Actor.Position - Player.Position).LengthSq());
+            var key = TargetKey.Create(e, Player);
             if (key.CompareTo(bestTargetKey) > 0)
             {
                 bestTarget = e.Actor;
@@ -103,11 +137,11 @@ public sealed class AutoTarget(RotationModuleManager manager, Actor player) : Ro
         if (strategy.Option(Track.TreasureHunt).As<Flag>() == Flag.Enabled)
             allowAll |= Bossmods.LoadedModules is [{ Info.Category: BossModuleInfo.Category.TreasureHunt }];
 
-        if (strategy.Option(Track.DeepDungeon).As<Flag>() == Flag.Enabled && !World.Party.WithoutSlot(includeDead: true, excludeNPCs: true).Skip(1).Any())
+        if (strategy.Option(Track.DeepDungeon).As<Flag>() == Flag.Enabled && World.Party.WithoutSlot(true, true, true).Length == 1)
             allowAll |= Bossmods.LoadedModules is [{ Info.Category: BossModuleInfo.Category.DeepDungeon }];
 
         if (strategy.Option(Track.EpicEcho).As<Flag>() == Flag.Enabled)
-            allowAll |= Utils.IsPlayerUnsynced(World);
+            allowAll |= Utils.IsUnsynced(World, Player);
 
         ulong huntTarget = 0;
 
@@ -138,6 +172,12 @@ public sealed class AutoTarget(RotationModuleManager manager, Actor player) : Ro
         }
 
         var targetZodiac = strategy.Option(Track.Zodiac).As<Flag>() == Flag.Enabled;
+
+        var targetForay = strategy.Option(Track.Foray).As<Flag>() == Flag.Enabled && Bossmods.ActiveModule is
+        {
+            Info.Category: BossModuleInfo.Category.Foray
+        };
+        var forayPrimaryActor = targetForay ? Bossmods.ActiveModule!.PrimaryActor.OID : default;
 
         // first deal with pulling new enemies
         foreach (var target in Hints.PotentialTargets)
@@ -174,8 +214,14 @@ public sealed class AutoTarget(RotationModuleManager manager, Actor player) : Ro
                 continue;
             }
 
+            if (targetForay && forayPrimaryActor != default && target.Actor.OID == forayPrimaryActor)
+            {
+                prioritize(target, 0);
+                continue;
+            }
+
             // add all other targets to potential targets list (e.g. if modules modify out-of-combat mob priority)
-            if (target.Priority >= 0)
+            if (target.Priority >= 0 || target.ShouldBeTargeted)
                 prioritize(target, target.Priority);
         }
 

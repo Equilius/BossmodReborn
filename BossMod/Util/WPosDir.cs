@@ -1,8 +1,7 @@
 ﻿namespace BossMod;
 
 // 2d vector that represents world-space direction on XZ plane
-[SkipLocalsInit]
-public readonly struct WDir(float x, float z)
+public readonly struct WDir(float x, float z) : IEquatable<WDir>
 {
     public readonly float X = x;
     public readonly float Z = z;
@@ -28,8 +27,8 @@ public readonly struct WDir(float x, float z)
 
     public readonly WDir Abs() => new(Math.Abs(X), Math.Abs(Z));
     public readonly WDir Sign() => new(Math.Sign(X), Math.Sign(Z));
-    public readonly WDir OrthoL() => new(Z, -X); // CCW, same length
-    public readonly WDir OrthoR() => new(-Z, X); // CW, same length
+    public readonly WDir OrthoL() => new(Z, -X); // CCW, same length (equals .Rotate(90f.Degrees()))
+    public readonly WDir OrthoR() => new(-Z, X); // CW, same length (equals .Rotate(-90f.Degrees()))
     public readonly WDir MirrorX() => new(-X, Z);
     public readonly WDir MirrorZ() => new(X, -Z);
     public static float Dot(WDir a, WDir b) => a.X * b.X + a.Z * b.Z;
@@ -59,7 +58,7 @@ public readonly struct WDir(float x, float z)
     public override readonly string ToString() => $"({X:f3}, {Z:f3})";
     public readonly bool Equals(WDir other) => this == other;
     public override readonly bool Equals(object? obj) => obj is WDir other && Equals(other);
-    public override readonly int GetHashCode() => (X, Z).GetHashCode(); // TODO: this is a hack, the default should be good enough, but for whatever reason (X, -Z).GetHashCode() == (-X, Z).GetHashCode()...
+    public override readonly int GetHashCode() => HashCode.Combine(X, Z);
 
     // area checks, assuming this is an offset from shape's center
     public readonly bool InRect(WDir direction, float lenFront, float lenBack, float halfWidth)
@@ -80,12 +79,13 @@ public readonly struct WDir(float x, float z)
 }
 
 // 2d vector that represents world-space position on XZ plane
-[SkipLocalsInit]
-public readonly struct WPos(float x, float z)
+public readonly struct WPos(float x, float z) : IEquatable<WPos>
 {
     public readonly float X = x;
     public readonly float Z = z;
     public WPos(Vector2 v) : this(v.X, v.Y) { }
+    public WPos(Vector3 v) : this(v.X, v.Z) { }
+    public WPos(ref Vector4 v) : this(v.X, v.Z) { }
     public readonly Vector2 ToVec2() => new(X, Z);
     public readonly Vector3 ToVec3(float y = 0) => new(X, y, Z);
     public readonly Vector4 ToVec4(float y = 0, float w = 0) => new(X, y, Z, w);
@@ -126,7 +126,7 @@ public readonly struct WPos(float x, float z)
 
     public static WPos RotateAroundOrigin(float rotateByDegrees, WPos origin, WPos point)
     {
-        var (sin, cos) = ((float, float))Math.SinCos(rotateByDegrees * Angle.DegToRad);
+        var (sin, cos) = MathF.SinCos(rotateByDegrees * Angle.DegToRad);
         var originX = origin.X;
         var originZ = origin.Z;
         var deltaX = point.X - originX;
@@ -151,7 +151,7 @@ public readonly struct WPos(float x, float z)
     public override readonly string ToString() => $"[{X:f3}, {Z:f3}]";
     public readonly bool Equals(WPos other) => this == other;
     public override readonly bool Equals(object? obj) => obj is WPos other && Equals(other);
-    public override readonly int GetHashCode() => (X, Z).GetHashCode(); // TODO: this is a hack, the default should be good enough, but for whatever reason (X, -Z).GetHashCode() == (-X, Z).GetHashCode()...
+    public override readonly int GetHashCode() => HashCode.Combine(X, Z);
 
     // area checks
     public readonly bool InTri(WPos v1, WPos v2, WPos v3)

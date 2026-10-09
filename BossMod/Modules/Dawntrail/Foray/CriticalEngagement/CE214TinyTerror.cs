@@ -120,7 +120,7 @@ sealed class TinyQuake(BossModule module) : Components.GenericAOEs(module)
         var max = count > 2 ? 2 : count;
         var aoes = CollectionsMarshal.AsSpan(Casters);
 
-        for (var i = 0; i < max; i++)
+        for (var i = 0; i < max; ++i)
         {
             ref var aoe = ref aoes[i];
             aoe.Color = i == 0 ? Colors.Danger : Colors.AOE;
@@ -134,8 +134,8 @@ sealed class TinyQuake(BossModule module) : Components.GenericAOEs(module)
 sealed class DiminutiveDualcast(BossModule module) : Components.GenericAOEs(module)
 {
     private readonly List<AOEInstance> Casters = [];
-    private readonly AOEShapeCone cone = new(40.0f, 30.0f.Degrees());
-    private readonly AOEShapeCircle circle = new(14.0f);
+    private readonly AOEShapeCone cone = new(40f, 30f.Degrees());
+    private readonly AOEShapeCircle circle = new(14f);
     public bool middleActive = false; // better control logic for the knockback sphere
 
     public override void OnCastStarted(Actor caster, ActorCastInfo spell)
@@ -177,10 +177,10 @@ sealed class DiminutiveDualcast(BossModule module) : Components.GenericAOEs(modu
         }
 
         var aoes = CollectionsMarshal.AsSpan(Casters);
-        var deadline = aoes[0].Activation.AddSeconds(1.0f);
+        var deadline = aoes[0].Activation.AddSeconds(1d);
         var max = count > 4 ? 4 : count;
 
-        for (var i = 0; i < max; i++)
+        for (var i = 0; i < max; ++i)
         {
             ref var aoe = ref aoes[i];
             if (aoe.Activation <= deadline)
@@ -193,7 +193,7 @@ sealed class DiminutiveDualcast(BossModule module) : Components.GenericAOEs(modu
     }
 }
 
-sealed class TinyMeteor(BossModule module) : Components.SimpleAOEs(module, (uint)AID.TinyMeteor, new AOEShapeCircle(6.0f))
+sealed class TinyMeteor(BossModule module) : Components.SimpleAOEs(module, (uint)AID.TinyMeteor, 6f)
 {
     public override ReadOnlySpan<AOEInstance> ActiveAOEs(int slot, Actor actor)
     {
@@ -204,7 +204,7 @@ sealed class TinyMeteor(BossModule module) : Components.SimpleAOEs(module, (uint
         }
 
         var aoes = CollectionsMarshal.AsSpan(Casters);
-        var deadline = aoes[0].Activation.AddSeconds(1.0f);
+        var deadline = aoes[0].Activation.AddSeconds(1d);
 
         var index = 0;
         while (index < count)
@@ -218,7 +218,7 @@ sealed class TinyMeteor(BossModule module) : Components.SimpleAOEs(module, (uint
             index++;
         }
 
-        for (var i = 0; i < index; i++)
+        for (var i = 0; i < index; ++i)
         {
             ref var aoe = ref aoes[i];
             aoe.Color = Colors.Danger;
@@ -330,8 +330,8 @@ sealed class Comet(BossModule module) : BossComponent(module)
 
 sealed class FlareHolyMerge(BossModule module) : BossComponent(module)
 {
-    private static readonly AOEShapeCircle flareShape = new(18.0f);
-    private const float holyKnockBackDistance = 15.0f;
+    private readonly AOEShapeCircle flareShape = new(18f);
+    private const float holyKnockBackDistance = 15f;
     private readonly record struct MergeCombination(WPos Origin, float Distance, bool IsFlare, DateTime Activation);
     private readonly List<MergeCombination> mergeCombinations = [];
 
@@ -353,9 +353,9 @@ sealed class FlareHolyMerge(BossModule module) : BossComponent(module)
             var activationStart = WorldState.FutureTime(9.1d);
             mergeCombinations.Sort((a, b) => a.Distance.CompareTo(b.Distance));
 
-            for (var i = 0; i < mergeCombinations.Count; i++)
+            for (var i = 0; i < mergeCombinations.Count; ++i)
             {
-                mergeCombinations[i] = mergeCombinations[i] with { Activation = activationStart + TimeSpan.FromSeconds(3.0d * i) };
+                mergeCombinations[i] = mergeCombinations[i] with { Activation = activationStart + TimeSpan.FromSeconds(3d * i) };
             }
         }
     }
@@ -382,13 +382,13 @@ sealed class FlareHolyMerge(BossModule module) : BossComponent(module)
         var nextCombinations = CollectionsMarshal.AsSpan(mergeCombinations);
         var max = count > 2 ? 2 : count;
 
-        for (var i = 0; i < max; i++)
+        for (var i = 0; i < max; ++i)
         {
             ref var combination = ref nextCombinations[i];
 
             if (combination.IsFlare)
             {
-                flareShape.Draw(Arena, combination.Origin, default, i == 0 ? Colors.Danger : Colors.AOE);
+                flareShape.Draw(Arena, combination.Origin, default, i == 0 ? Colors.Danger : default);
             }
 
             if (!combination.IsFlare)
@@ -410,13 +410,13 @@ sealed class FlareHolyMerge(BossModule module) : BossComponent(module)
         var nextCombinations = CollectionsMarshal.AsSpan(mergeCombinations);
         var max = count > 2 ? 2 : count;
 
-        for (var i = 0; i < max; i++)
+        for (var i = 0; i < max; ++i)
         {
             ref var combination = ref nextCombinations[i];
 
             if (!combination.IsFlare)
             {
-                Arena.ZoneCircle(combination.Origin, 2.0f, Colors.Other7);
+                Arena.ZoneCircle(combination.Origin, 2f, Colors.Other7);
             }
         }
     }
@@ -432,7 +432,7 @@ sealed class FlareHolyMerge(BossModule module) : BossComponent(module)
         var nextCombinations = CollectionsMarshal.AsSpan(mergeCombinations);
         var max = count > 2 ? 2 : count;
 
-        for (var i = 0; i < max; i++)
+        for (var i = 0; i < max; ++i)
         {
             ref var combination = ref nextCombinations[i];
 
@@ -464,7 +464,7 @@ sealed class FlareHolyMerge(BossModule module) : BossComponent(module)
         var max = count > 2 ? 2 : count;
         var knockbackSetup = false;
 
-        for (var i = 0; i < max; i++)
+        for (var i = 0; i < max; ++i)
         {
             ref var combination = ref nextCombinations[i];
             if (combination.IsFlare)
@@ -667,7 +667,7 @@ sealed class SphereGrowable(BossModule module) : BossComponent(module)
             var bestIndex = -1;
             var bestDot = float.MinValue;
 
-            for (var i = 0; i < mages.Count; i++)
+            for (var i = 0; i < mages.Count; ++i)
             {
                 if (i == startIndex)
                 {
@@ -695,7 +695,6 @@ sealed class SphereGrowable(BossModule module) : BossComponent(module)
     }
 }
 
-[SkipLocalsInit]
 sealed class CE214TinyTerrorStates : StateMachineBuilder
 {
     public CE214TinyTerrorStates(BossModule module) : base(module)
@@ -711,25 +710,8 @@ sealed class CE214TinyTerrorStates : StateMachineBuilder
     }
 }
 
-[ModuleInfo(BossModuleInfo.Maturity.Contributed,
-    StatesType = typeof(CE214TinyTerrorStates),
-    ConfigType = null, // replace null with typeof(TinyMageConfig) if applicable
-    ObjectIDType = typeof(OID),
-    ActionIDType = typeof(AID),
-    StatusIDType = typeof(SID),
-    TetherIDType = typeof(TetherID),
-    IconIDType = null, // replace null with typeof(IconID) if applicable
-    PrimaryActorOID = (uint)OID.TinyMage,
-    Contributors = "Equilius",
-    Expansion = BossModuleInfo.Expansion.Dawntrail,
-    Category = BossModuleInfo.Category.Foray,
-    GroupType = BossModuleInfo.GroupType.CriticalEngagement,
-    GroupID = 1093u,
-    NameID = 60u,
-    SortOrder = 12,
-    PlanLevel = 0)]
-[SkipLocalsInit]
-public sealed class CE214TinyTerror(WorldState ws, Actor primary) : BossModule(ws, primary, new(152.000f, 716.000f), new ArenaBoundsCircle(20f))
+[ModuleInfo(BossModuleInfo.Maturity.Contributed, PrimaryActorOID = (uint)OID.TinyMage, Contributors = "Equilius", GroupType = BossModuleInfo.GroupType.CriticalEngagement, GroupID = 1093u, NameID = 60u)]
+public sealed class CE214TinyTerror(WorldState ws, Actor primary) : BossModule(ws, primary, new(152f, 716f), new ArenaBoundsCircle(20f))
 {
     protected override void DrawEnemies(int pcSlot, Actor pc)
     {

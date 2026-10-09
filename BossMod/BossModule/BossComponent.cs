@@ -3,7 +3,6 @@
 // different encounter mechanics can be split into independent components
 // individual components should be activated and deactivated when needed (typically by state machine transitions)
 // components can also have sub-components; typically these are created immediately by constructor
-[SkipLocalsInit]
 public class BossComponent(BossModule module)
 {
     public readonly BossModule Module = module;
@@ -38,7 +37,7 @@ public class BossComponent(BossModule module)
     public virtual void Update() { } // called every frame - it is a good place to update any cached values
     public virtual void AddHints(int slot, Actor actor, TextHints hints) { } // gather any relevant pieces of advice for specified raid member
     public virtual void AddMovementHints(int slot, Actor actor, MovementHints movementHints) { } // gather movement hints for specified raid member
-    public virtual void AddGlobalHints(GlobalHints hints) { } // gather any relevant pieces of advice for whole raid
+    public virtual void AddGlobalHints(Actor actor, GlobalHints hints) { } // gather any relevant pieces of advice for whole raid
     public virtual void AddAIHints(int slot, Actor actor, PartyRolesConfig.Assignment assignment, AIHints hints) { } // gather AI hints for specified raid member
     public virtual PlayerPriority CalcPriority(int pcSlot, Actor pc, int playerSlot, Actor player, ref uint customColor) => PlayerPriority.Irrelevant; // determine how particular party member should be drawn; if custom color is left untouched, standard color is selected
     public virtual void DrawArenaBackground(int pcSlot, Actor pc) { } // called at the beginning of arena draw, good place to draw aoe zones
@@ -77,6 +76,19 @@ public class BossComponent(BossModule module)
     protected PartyState Raid => Module.Raid;
     protected void ReportError(string message) => Module.ReportError(this, message);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected bool ArenaProjectionLayerApplies(Actor actor, int? mechanicLayer, bool? restrictToLayer)
+        => Module.MechanicAppliesToArenaProjectionLayer(actor, mechanicLayer, restrictToLayer);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected bool ArenaProjectionLayerParticipantApplies(Actor actor, int? mechanicLayer, bool? restrictToLayer)
+        => Module.ActorMatchesArenaProjectionLayer(actor, mechanicLayer, restrictToLayer);
+
+    // All-layer mechanics ignore an authored floor when clipping forbidden zones/obstacles.
+    // Both boolean values preserve the existing explicit-floor AI geometry.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected static int? ArenaProjectionLayerForAI(int? mechanicLayer, bool? restrictToLayer)
+        => restrictToLayer.HasValue ? mechanicLayer : null;
+
     // utility to try to determine who has the highest enmity in the party
     // this is useful for a lot of savage mechanics, but we only get this information if the player is currently targeting the relevant enemy (:/), so we allow fallback behavior of returning players in order tank -> dps -> healer -> (other)
     public List<(int, Actor)> RaidWithSlotByEnmity(Actor primaryTarget, bool allowGuessing = true)
@@ -87,7 +99,9 @@ public class BossComponent(BossModule module)
         if (table.InstanceID != primaryTarget.InstanceID)
         {
             if (!allowGuessing)
+            {
                 return [];
+            }
 
             var guessed = new List<(int Key, int Index, (int, Actor) Value)>(count);
             for (var i = 0; i < count; ++i)
@@ -105,10 +119,13 @@ public class BossComponent(BossModule module)
                     };
                 guessed.Add((key, i, r));
             }
-            guessed.Sort((a, b) => a.Key != b.Key ? a.Key.CompareTo(b.Key) : a.Index.CompareTo(b.Index));
+            guessed.Sort(static (a, b) => a.Key != b.Key ? a.Key.CompareTo(b.Key) : a.Index.CompareTo(b.Index));
             var guessedResult = new List<(int, Actor)>(count);
-            for (var i = 0; i < guessed.Count; ++i)
+            var countG = guessed.Count;
+            for (var i = 0; i < countG; ++i)
+            {
                 guessedResult.Add(guessed[i].Value);
+            }
             return guessedResult;
         }
 
@@ -118,29 +135,39 @@ public class BossComponent(BossModule module)
         {
             var r = withSlot[i];
             var instanceID = r.Item2.InstanceID;
-            for (var j = 0; j < targets.Length; ++j)
+            var lenT = targets.Length;
+            for (var j = 0; j < lenT; ++j)
             {
-                if (targets[j].InstanceID == instanceID)
+                var t = targets[j];
+                if (t.InstanceID == instanceID)
                 {
-                    if (targets[j].InstanceID > 0)
-                        result.Add((targets[j].Enmity, i, r));
+                    if (t.InstanceID > 0u)
+                    {
+                        result.Add((t.Enmity, i, r));
+                    }
                     break;
                 }
             }
         }
-        result.Sort((a, b) => a.Enmity != b.Enmity ? b.Enmity.CompareTo(a.Enmity) : a.Index.CompareTo(b.Index));
+        result.Sort(static (a, b) => a.Enmity != b.Enmity ? b.Enmity.CompareTo(a.Enmity) : a.Index.CompareTo(b.Index));
         var final = new List<(int, Actor)>(result.Count);
-        for (var i = 0; i < result.Count; ++i)
+        var countR = result.Count;
+        for (var i = 0; i < countR; ++i)
+        {
             final.Add(result[i].Value);
+        }
         return final;
     }
 
     public List<Actor> RaidByEnmity(Actor primaryTarget, bool allowGuessing = true)
     {
         var withSlot = RaidWithSlotByEnmity(primaryTarget, allowGuessing);
-        var result = new List<Actor>(withSlot.Count);
-        for (var i = 0; i < withSlot.Count; ++i)
+        var count = withSlot.Count;
+        var result = new List<Actor>(count);
+        for (var i = 0; i < count; ++i)
+        {
             result.Add(withSlot[i].Item2);
+        }
         return result;
     }
 }

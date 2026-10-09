@@ -68,7 +68,7 @@ public sealed class BLU(RotationModuleManager manager, Actor player) : Castxan<A
 
         Mimic = CurrentMimic();
 
-        if (Utils.IsPlayerUnsynced(World, mightyGuard: true))
+        if (Utils.IsMultiplayerDuty(World) && World.Party.WithoutSlot(includeDead: false, excludeNPCs: true).Count() == 1)
         {
             if (CanUse(AID.BasicInstinct) && Player.FindStatus(SID.MightyGuard) == null)
                 PushGCD(AID.MightyGuard, Player);
@@ -91,7 +91,7 @@ public sealed class BLU(RotationModuleManager manager, Actor player) : Castxan<A
         var haveModule = Bossmods.ActiveModule?.StateMachine.ActiveState != null;
 
         // mortal flame
-        if (primaryTarget is { } p && StatusDetails(p.Actor, SID.MortalFlame, Player.InstanceID).Left == 0 && Hints.PriorityTargets.Count == 1 && haveModule)
+        if (primaryTarget is { } p && StatusDetails(p.Actor, SID.MortalFlame, Player.InstanceID).Left == 0 && Hints.PriorityTargetsSpan.Length == 1 && haveModule)
             PushGCD(AID.MortalFlame, p, GCDPriority.GCDWithCooldown);
 
         if (haveModule && currentHP * 2 < Player.HPMP.MaxHP)
@@ -145,7 +145,7 @@ public sealed class BLU(RotationModuleManager manager, Actor player) : Castxan<A
             var nearbyTotal = 0;
             var nearbyFrozen = 0;
 
-            foreach (var target in Hints.PriorityTargets)
+            foreach (var target in Hints.PriorityTargetsSpan)
             {
                 ++priorityTotal;
                 if (target.Actor.Position.InCircle(Player.Position, 6 + Player.HitboxRadius + target.Actor.HitboxRadius))
@@ -178,7 +178,7 @@ public sealed class BLU(RotationModuleManager manager, Actor player) : Castxan<A
             PushOGCD(AID.LucidDreaming, Player);
 
         if (NextGCD is AID.GoblinPunch or AID.Devour && primaryTarget is { } t)
-            Hints.GoalZones.Add(GoalSingleTarget(t.Actor, Positional.Front, 3));
+            Hints.GoalZones.Add(Hints.GoalSingleTarget(t.Actor, Positional.Front, Player, World.Actors, 3f));
     }
 
     private void TankSpecific(Enemy? primaryTarget)

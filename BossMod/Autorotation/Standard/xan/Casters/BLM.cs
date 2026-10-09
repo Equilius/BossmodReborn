@@ -268,7 +268,7 @@ public sealed class BLM(RotationModuleManager manager, Actor player) : Castxan<A
             return;
         }
 
-        if (!Hints.PriorityTargets.Any(p => Player.DistanceToHitbox(p.Actor) < 40))
+        if (!Hints.AnyPriorityTarget(p => Player.DistanceToHitbox(p.Actor) < 40f))
         {
             if (ReadyIn(AID.Transpose) == 0)
             {
@@ -313,7 +313,7 @@ public sealed class BLM(RotationModuleManager manager, Actor player) : Castxan<A
                 PushGCD((AID)PhantomID.Iainuki, primaryTarget, GCDPriority.Max);
 
             if (ready <= GCD + 0.05f + GCDLength * 2f)
-                Hints.GoalZones.Add(GoalSingleTarget(primaryTarget.Actor, 8f));
+                Hints.GoalZones.Add(Hints.GoalSingleTarget(primaryTarget.Actor, Player, World.Actors, 8f));
         }
 
         if (strategy.AutoTimeMage.IsEnabled())

@@ -222,7 +222,7 @@ sealed class WaterCrystal(BossModule module) : Components.GenericBaitProximity(m
         }
 
         var players = Raid.WithoutSlot().SortedByRange(waterCrystal.Value.actor.Position).ToList();
-        for (var i = 0; i < 2; i++)
+        for (var i = 0; i < 2; ++i)
         {
             CurrentBaits.Add(new(players[i], new AOEShapeCircle(5.0f)));
         }
@@ -233,13 +233,13 @@ sealed class WaterCrystal(BossModule module) : Components.GenericBaitProximity(m
             return;
         }
 
-        for (var i = 0; i < 2; i++)
+        for (var i = 0; i < 2; ++i)
         {
             CurrentBaits.Add(new(debuffPlayers[i].actor, new AOEShapeDonut(4.0f, 10.0f)));
         }
     }
 
-    public override void AddGlobalHints(GlobalHints hints)
+    public override void AddGlobalHints(Actor actor, GlobalHints hints)
     {
         hints.Add($"Element: {crystals?.nextElement}");
     }
@@ -324,7 +324,7 @@ sealed class FireCrystal(BossModule module) : Components.GenericBaitProximity(mo
         }
 
         var players = Raid.WithoutSlot().SortedByRange(fireCrystal.Value.actor.Position).ToList();
-        for (var i = 0; i < 2; i++)
+        for (var i = 0; i < 2; ++i)
         {
             CurrentBaits.Add(new(players[i], new AOEShapeDonut(4.0f, 10.0f)));
         }
@@ -335,13 +335,13 @@ sealed class FireCrystal(BossModule module) : Components.GenericBaitProximity(mo
             return;
         }
 
-        for (var i = 0; i < 2; i++)
+        for (var i = 0; i < 2; ++i)
         {
             CurrentBaits.Add(new(debuffPlayers[i].actor, new AOEShapeCircle(5.0f)));
         }
     }
 
-    public override void AddGlobalHints(GlobalHints hints)
+    public override void AddGlobalHints(Actor actor, GlobalHints hints)
     {
         hints.Add($"Element: {crystals?.nextElement}");
     }
@@ -715,9 +715,9 @@ sealed class HeadTailWind(BossModule module) : Components.GenericKnockback(modul
             var toSource = (knockback.Origin - pc.Position).Normalized();
             var safeFacing = (Direction[pcSlot] == (uint)SID.Headwind ? -toSource : toSource).ToAngle();
             Arena.PathArcTo(pc.Position, 1, (safeFacing + 45f.Degrees()).Rad, (safeFacing - 45f.Degrees()).Rad);
-            MiniArena.PathStroke(false, Colors.Safe);
+            Arena.PathStroke(false, Colors.Safe);
             Arena.PathArcTo(pc.Position, 1, (safeFacing + 225f.Degrees()).Rad, (safeFacing + 135f.Degrees()).Rad);
-            MiniArena.PathStroke(false, Colors.Danger);
+            Arena.PathStroke(false, Colors.Danger);
         }
     }
 
@@ -875,7 +875,7 @@ sealed class SlapHappyBaits(BossModule module) : Components.GenericBaitStack(mod
             BitMask allowedHealers = default;
             BitMask allowedDDs = default;
 
-            for (var i = 0; i < party.Length; i++)
+            for (var i = 0; i < party.Length; ++i)
             {
                 ref var p = ref party[i];
 
@@ -899,7 +899,7 @@ sealed class SlapHappyBaits(BossModule module) : Components.GenericBaitStack(mod
             var addedHealer = false;
             var addedDD = false;
 
-            for (var i = 0; i < party.Length; i++)
+            for (var i = 0; i < party.Length; ++i)
             {
                 ref var player = ref party[i];
                 var p = player.Item2;
@@ -1092,7 +1092,7 @@ sealed class BlackHole(BossModule module) : Components.BaitAwayTethers(module, n
     {
         base.DrawArenaForeground(pcSlot, pc);
 
-        for (var i = 0; i < Tethers.Count; i++)
+        for (var i = 0; i < Tethers.Count; ++i)
         {
             var (blackHoleActor, targetID) = Tethers[i];
             var target = WorldState.Actors.Find(targetID);
@@ -1144,10 +1144,11 @@ sealed class P3BlizzardBaits(BossModule module) : Components.SimpleAOEs(module, 
     }
 }
 
-sealed class P3Blizzard(BossModule module) : Components.GenericBaitAway(module, centerAtTarget: true, onlyShowOutlines: true)
+sealed class P3Blizzard(DMU module) : Components.GenericBaitAway(module, centerAtTarget: true, onlyShowOutlines: true)
 {
     private Actor? boss = null;
     private readonly PartyRolesConfig partyConfig = Service.Config.Get<PartyRolesConfig>();
+    private readonly Actor kefkaBoss = module.BossP3()!;
 
     public override void OnCastStarted(Actor caster, ActorCastInfo spell)
     {
@@ -1188,12 +1189,6 @@ sealed class P3Blizzard(BossModule module) : Components.GenericBaitAway(module, 
 
         if (NumCasts >= 16)
         { // TODO remove this when adding hints array
-            return;
-        }
-
-        var kefkaBoss = ((DMU)Module).BossP3();
-        if (kefkaBoss == null)
-        {
             return;
         }
 

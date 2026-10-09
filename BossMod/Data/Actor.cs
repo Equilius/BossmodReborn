@@ -38,10 +38,10 @@ public sealed class ActorCastInfo
     public bool Interruptible;
     public bool EventHappened;
 
-    public WPos LocXZ => new(Location.XZ());
+    public WPos LocXZ => new(Location);
     public float RemainingTime => TotalTime - ElapsedTime;
     public float NPCTotalTime => TotalTime + NPCFinishDelay;
-    public float NPCRemainingTime => NPCTotalTime - ElapsedTime;
+    public float NPCRemainingTime => RemainingTime <= 0f ? 0f : NPCTotalTime - ElapsedTime;
     public float AdjustedTotalTime => TotalTime + Action.CastTimeExtra();
 
     public bool IsSpell() => Action.Type == ActionType.Spell;
@@ -70,13 +70,13 @@ public sealed class ActorCastEvent(ActionID action, ulong mainTargetID, float an
 
     public readonly List<Target> Targets = [];
 
-    public WPos TargetXZ => new(TargetPos.XZ());
+    public WPos TargetXZ => new(TargetPos);
 
     public bool IsSpell() => Action.Type == ActionType.Spell;
     public bool IsSpell<AID>(AID aid) where AID : Enum => Action == ActionID.MakeSpell(aid);
 }
 
-public struct ActorHPMP(uint curHP, uint maxHP, uint shield, uint curMP, uint maxMP)
+public struct ActorHPMP(uint curHP, uint maxHP, uint shield, uint curMP, uint maxMP) : IEquatable<ActorHPMP>
 {
     public uint CurHP = curHP;
     public uint MaxHP = maxHP;
@@ -108,7 +108,7 @@ public struct ActorStatus(uint id, ushort extra, DateTime expireAt, ulong source
     public readonly ulong SourceID = sourceID;
 }
 
-public readonly struct ActorModelState(byte modelState, byte animState1, byte animState2)
+public readonly struct ActorModelState(byte modelState, byte animState1, byte animState2) : IEquatable<ActorModelState>
 {
     public readonly byte ModelState = modelState;
     public readonly byte AnimState1 = animState1;
@@ -124,7 +124,7 @@ public readonly struct ActorModelState(byte modelState, byte animState1, byte an
     public override string ToString() => $"ModelState: {ModelState}, AnimState1: {AnimState1}, AnimState2: {AnimState2}";
 }
 
-public readonly struct ActorForayInfo(byte level, byte element)
+public readonly struct ActorForayInfo(byte level, byte element) : IEquatable<ActorForayInfo>
 {
     public readonly byte Level = level;
     public readonly byte Element = element;
@@ -228,11 +228,11 @@ public sealed class Actor(ulong instanceID, uint oid, int spawnIndex, uint layou
 
     public Role Role => Class.GetRole();
     public ClassCategory ClassCategory => Class.GetClassCategory();
-    public WPos Position => new(PosRot.X, PosRot.Z);
-    public WPos PrevPosition => new(PrevPosRot.X, PrevPosRot.Z);
+    public WPos Position => new(ref PosRot);
+    public WPos PrevPosition => new(ref PrevPosRot);
     public WDir LastFrameMovement => Position - PrevPosition;
     public Vector4 LastFrameMovementVec4 => PosRot - PrevPosRot;
-    public Angle Rotation => PosRot.W.Radians();
+    public Angle Rotation => new(ref PosRot);
     public bool Omnidirectional
     {
         get;

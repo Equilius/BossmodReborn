@@ -296,7 +296,7 @@ public sealed class UIPresetEditor
         {
             if (combo)
             {
-                for (var i = 0; i < ms.Definition.Configs.Count; i++)
+                for (var i = 0; i < ms.Definition.Configs.Count; ++i)
                     if (ImGui.Selectable(ms.Definition.Configs[i].UIName))
                     {
                         ms.SerializedSettings.Add(new(Preset.Modifier.Shift, i, ms.Definition.Configs[i].CreateForEditor()));
@@ -304,7 +304,7 @@ public sealed class UIPresetEditor
             }
         }
 
-        for (var i = 0; i < ms.SerializedSettings.Count; i++)
+        for (var i = 0; i < ms.SerializedSettings.Count; ++i)
         {
             ref var val = ref ms.SerializedSettings.Ref(i);
             if (val.Mod == default)
@@ -357,7 +357,7 @@ public sealed class UIPresetEditor
 
     private bool DrawModifier(ref Preset.Modifier mod, Preset.Modifier flag, string label)
     {
-        var value = mod.HasFlag(flag);
+        var value = (mod & flag) != 0;
         using var _ = ImRaii.Disabled(mod == flag);
 
         if (ImGui.Checkbox(label, ref value))

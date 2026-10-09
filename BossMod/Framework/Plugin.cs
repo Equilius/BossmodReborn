@@ -11,11 +11,12 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 
+[module: SkipLocalsInit]
 namespace BossMod;
 
 public sealed class Plugin : IAsyncDalamudPlugin
 {
-    public string Name => "BossMod Reborn";
+    public static string Name => "BossMod Reborn";
 
     private readonly IDalamudPluginInterface _dalamud;
     private readonly ICommandManager CommandManager;
@@ -43,11 +44,13 @@ public sealed class Plugin : IAsyncDalamudPlugin
     private DateTime _throttleInteract;
     private DateTime _throttleFateSync;
     private DateTime _throttleLeaveDuty;
+    private WorldOverlayNode? _worldOverlayNode;
 
     // windows
     private ConfigUI _configUI = null!; // TODO: should be a proper window!
     private BossModuleMainWindow _wndBossmod = null!;
     private BossModuleHintsWindow _wndBossmodHints = null!;
+    private BossModulePrePullHintsWindow _wndBossmodPrePullHints = null!;
     private ZoneModuleWindow _wndZone = null!;
     private ReplayManagementWindow _wndReplay = null!;
     private UIRotationWindow _wndRotation = null!;
@@ -63,9 +66,9 @@ public sealed class Plugin : IAsyncDalamudPlugin
         {
             dalamud.ConfigDirectory.Create();
         }
-
-        var dalamudRoot = dalamud.GetType().Assembly.
-                GetType("Dalamud.Service`1", true)!.MakeGenericType(dalamud.GetType().Assembly.GetType("Dalamud.Dalamud", true)!).
+        var type = dalamud.GetType().Assembly;
+        var dalamudRoot = type.
+                GetType("Dalamud.Service`1", true)!.MakeGenericType(type.GetType("Dalamud.Dalamud", true)!).
                 GetMethod("Get")!.Invoke(null, BindingFlags.Default, null, [], null);
         var dalamudStartInfo = dalamudRoot?.GetType().GetProperty("StartInfo", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(dalamudRoot) as DalamudStartInfo;
         _gameVersion = dalamudStartInfo?.GameVersion?.ToString() ?? "unknown";
@@ -103,6 +106,8 @@ public sealed class Plugin : IAsyncDalamudPlugin
         Service.Condition.ConditionChange += OnConditionChanged;
         MultiboxUnlock.Exec();
         Camera.Instance = new();
+        _worldOverlayNode = new();
+        Dx11ArenaRenderer.SetWorldOverlayNode(_worldOverlayNode);
 
         Service.Config.Modified.Subscribe(() => Task.Run(() => Service.Config.SaveToFile(_dalamud.ConfigFile)));
 
@@ -131,6 +136,7 @@ public sealed class Plugin : IAsyncDalamudPlugin
         _wndBossmod = new(_bossmod, _zonemod);
         Service.BossModWindow = _wndBossmod;
         _wndBossmodHints = new(_bossmod, _zonemod);
+        _wndBossmodPrePullHints = new(_bossmod);
         _wndZone = new(_zonemod);
         var config = Service.Config.Get<ReplayManagementConfig>();
         var replayDir = string.IsNullOrEmpty(config.ReplayFolder) ? _dalamud.ConfigDirectory.FullName + "/replays" : config.ReplayFolder;
@@ -152,12 +158,17 @@ public sealed class Plugin : IAsyncDalamudPlugin
         {
             _dalamud.UiBuilder.Draw -= DrawUI;
             Service.Condition.ConditionChange -= OnConditionChanged;
+            Dx11ArenaRenderer.SetWorldOverlayNode(null);
+            _worldOverlayNode?.Dispose();
+            _worldOverlayNode = null;
+            Dx11ArenaRenderer.Shutdown();
         });
         ReplayVisualization.GaugeVisualizer.Dispose();
         _wndDebug.Dispose();
         _wndRotation.Dispose();
         _wndReplay.Dispose();
         _wndZone.Dispose();
+        _wndBossmodPrePullHints.Dispose();
         _wndBossmodHints.Dispose();
         _wndBossmod.Dispose();
         _configUI.Dispose();
@@ -174,7 +185,6 @@ public sealed class Plugin : IAsyncDalamudPlugin
         _zonemod.Dispose();
         _bossmod.Dispose();
         _rsr.Dispose();
-        Dx11ArenaRenderer.Shutdown();
         CommandManager.RemoveHandler("/bmr");
         GarbageCollection();
     }
@@ -255,15 +265,15 @@ public sealed class Plugin : IAsyncDalamudPlugin
     {
         var defaultConfig = ColorConfig.DefaultConfig;
         var currentConfig = Service.Config.Get<ColorConfig>();
-        var fields = typeof(ColorConfig).GetFields(BindingFlags.Public | BindingFlags.Instance);
-
-        for (var i = 0; i < fields.Length; ++i)
+        var fields = GeneratedConfigMetadata.Get<ColorConfig>().Fields;
+        var len = fields.Length;
+        for (var i = 0; i < len; ++i)
         {
-            ref var field = ref fields[i];
-            var value = field.GetValue(defaultConfig);
+            var field = fields[i];
+            var value = field.Getter(defaultConfig);
             if (value is Color or Color[])
             {
-                field.SetValue(currentConfig, value);
+                field.Setter(currentConfig, value);
             }
         }
 
@@ -314,6 +324,7 @@ public sealed class Plugin : IAsyncDalamudPlugin
         _amex.FinishActionGather();
 
         var uiHidden = Service.GameGui.GameUiHidden || Service.Condition[ConditionFlag.OccupiedInCutSceneEvent] || Service.Condition[ConditionFlag.WatchingCutscene78] || Service.Condition[ConditionFlag.WatchingCutscene];
+        UpdateScreenRiskBorder(uiHidden);
         if (!uiHidden)
         {
             Service.WindowSystem?.Draw();
@@ -323,6 +334,30 @@ public sealed class Plugin : IAsyncDalamudPlugin
 
         Camera.Instance?.DrawWorldPrimitives();
         _prevUpdateTime = DateTime.Now - tsStart;
+    }
+
+    private void UpdateScreenRiskBorder(bool uiHidden)
+    {
+        var config = BossModuleManager.Config;
+        var module = _bossmod.ActiveModule;
+        var pc = _ws.Party[PartyState.PlayerSlot];
+        var enabled = config.ShowScreenRiskBorder && !uiHidden && module != null && pc != null && !pc.IsDead;
+        var haveRisks = false;
+        if (enabled && config.ScreenRiskBorderIntensity > 0f)
+        {
+            var hints = module!.CalculateHintsForRaidMember(PartyState.PlayerSlot, pc!);
+            var count = hints.Count;
+            for (var i = 0; i < count; ++i)
+            {
+                if (hints[i].Item2)
+                {
+                    haveRisks = true;
+                    break;
+                }
+            }
+        }
+
+        Camera.Instance?.UpdateScreenRiskBorder(enabled, haveRisks, Colors.Enemy, config.ScreenRiskBorderIntensity);
     }
 
     private unsafe bool QuestUnlocked(uint link)
@@ -558,19 +593,23 @@ public sealed class Plugin : IAsyncDalamudPlugin
 
     private static bool ToggleRadar(string[] messageData)
     {
-        var config = Service.Config.Get<BossModuleConfig>();
+        // Use existing config. Having two streams open to one config causes problems.
+        var config = MiniArena.Config;
 
         if (messageData.Length == 1)
-            config.Enable = !config.Enable;
+            config.EnableRadar = !config.EnableRadar;
         else
         {
             switch (messageData[1].ToUpperInvariant())
             {
                 case "ON":
-                    config.Enable = true;
+                    config.EnableRadar = true;
                     break;
                 case "OFF":
-                    config.Enable = false;
+                    config.EnableRadar = false;
+                    break;
+                case "RESET":
+                    Service.BossModWindow?.RecenterWindow();
                     break;
                 default:
                     Service.ChatGui.Print($"[BMR] Unknown radar command: {messageData[1]}");
@@ -579,7 +618,7 @@ public sealed class Plugin : IAsyncDalamudPlugin
         }
 
         config.Modified.Fire();
-        Service.Log($"Radar is now {(config.Enable ? "enabled" : "disabled")}");
+        Service.Log($"Radar is now {(config.EnableRadar ? "enabled" : "disabled")}");
         return true;
     }
 }

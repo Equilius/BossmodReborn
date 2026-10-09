@@ -23,24 +23,21 @@ sealed class Hints(BossModule module) : BossComponent(module) {
     }
 }
 
-[ModuleInfo(BossModuleInfo.Maturity.WIP,
-    StatesType = typeof(DMUStates),
-    ConfigType = typeof(DMUConfig),
-    ObjectIDType = typeof(OID),
-    ActionIDType = typeof(AID),
-    StatusIDType = typeof(SID),
-    TetherIDType = typeof(TetherID),
-    IconIDType = typeof(IconID),
-    PrimaryActorOID = (uint)OID.Kefka,
-    Contributors = "Equilius",
-    Expansion = BossModuleInfo.Expansion.Dawntrail,
-    Category = BossModuleInfo.Category.Ultimate,
-    GroupType = BossModuleInfo.GroupType.CFC,
-    GroupID = 1094u,
-    NameID = 7131u,
-    SortOrder = 1,
-    PlanLevel = 100)]
-[SkipLocalsInit]
+[ModuleInfo(BossModuleInfo.Maturity.WIP, PrimaryActorOID = (uint)OID.Kefka, Contributors = "Equilius", Expansion = BossModuleInfo.Expansion.Dawntrail,
+    Category = BossModuleInfo.Category.Ultimate, GroupType = BossModuleInfo.GroupType.CFC, GroupID = 1094u, NameID = 7131u, SortOrder = 1, PlanLevel = 100)]
+public sealed class DMU : BossModule
+{
+    public DMU(WorldState ws, Actor primary) : this(ws, primary, BuildArena()) { }
+
+    private DMU(WorldState ws, Actor primary, (WPos center, ArenaBoundsCustom arena) a) : base(ws, primary, a.center, a.arena) { }
+
+    public static (WPos center, ArenaBoundsCustom arena) BuildArena()
+    {
+        var arena = new ArenaBoundsCustom([new Polygon(new(100f, 100f), 20f, 64)]) { WorldProjectionHeight = 0f, Y = 0.1f, BorderY = 0f }; // looks ugly if we use any projection height due to weird floor geometry
+        return (arena.Center, arena);
+    }
+
+    public override bool ShouldPrioritizeAllEnemies => true;
 
 public sealed class DMU : BossModule {
     public DMU(WorldState ws, Actor primary) : base(ws, primary, new(100.000f, 100.000f), new ArenaBoundsCircle(20.0f)) {

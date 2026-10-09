@@ -1,4 +1,4 @@
-﻿namespace BossMod.Modules.Dawntrail.Extreme.Ex8Enuo;
+﻿namespace BossMod.Dawntrail.Extreme.Ex8Enuo;
 
 //TODO: This needs a way to move the source to the other side of the target.
 sealed class NaughtGrowsWildCharge(BossModule module) : Components.InverseWildCharge(module, 3f, 6f)
@@ -11,7 +11,7 @@ sealed class NaughtGrowsWildCharge(BossModule module) : Components.InverseWildCh
             case (uint)IconID.NaughtGrowsWildChargeSingle:
                 Source = actor;
                 var party = Raid.WithoutSlot(true, false, false);
-                for (var i = 0; i < party.Length; i++)
+                for (var i = 0; i < party.Length; ++i)
                 {
                     var p = party[i];
                     if (p.InstanceID != targetID)
@@ -33,7 +33,7 @@ sealed class NaughtGrowsWildCharge(BossModule module) : Components.InverseWildCh
             case (uint)IconID.NaughtGrowsWildChargeDouble:
                 Source = actor;
                 var partya = Raid.WithoutSlot(true, false, false);
-                for (var i = 0; i < partya.Length; i++)
+                for (var i = 0; i < partya.Length; ++i)
                 {
                     var p = partya[i];
                     PlayerRoles[Raid.FindSlot(p.InstanceID)] = p.Role switch
@@ -50,14 +50,14 @@ sealed class NaughtGrowsWildCharge(BossModule module) : Components.InverseWildCh
     {
         if (spell.Action.ID == (uint)AID.GreatReturnToNothing)
         {
-            for (var i = 0; i < PlayerRoles.Length; i++)
+            for (var i = 0; i < PlayerRoles.Length; ++i)
             {
                 PlayerRoles[i] = default;
             }
         }
         if (spell.Action.ID == (uint)AID.ReturnToNothing)
         {
-            for (var i = 0; i < PlayerRoles.Length; i++)
+            for (var i = 0; i < PlayerRoles.Length; ++i)
             {
                 PlayerRoles[i] = default;
             }

@@ -31,7 +31,7 @@ sealed class GrandCrossOrder(BossModule module) : BossComponent(module)
             {
                 var buffs = new List<(uint buff, DateTime expireAt)>[PartyState.MaxPartySize];
 
-                for (var i = 0; i < PartyState.MaxPartySize; i++)
+                for (var i = 0; i < PartyState.MaxPartySize; ++i)
                 {
                     buffs[i] = [];
                 }
@@ -154,7 +154,7 @@ sealed class TsunamiInfernoOrder(BossModule module) : BossComponent(module)
             if ((status.Extra == 0x45F || status.Extra == 0x460) && !tellingTruthCaught)
             {
                 var buffs = new List<(uint buff, DateTime expireAt)>[PartyState.MaxPartySize];
-                for (var i = 0; i < buffs.Length; i++)
+                for (var i = 0; i < buffs.Length; ++i)
                 {
                     buffs[i] = [];
                 }
@@ -616,8 +616,8 @@ sealed class CursedShriek(BossModule module) : Components.GenericGaze(module)
             {
                 continue;
             }
-
-            eyes.Add(new Eye(actor.Position, expireAt, inverted: inverted));
+            var loc = actor.Position.Quantized();
+            eyes.Add(new(loc, expireAt, inverted: inverted, eyeCenter: loc));
         }
 
         return CollectionsMarshal.AsSpan(eyes);
@@ -645,7 +645,7 @@ sealed class CursedShriek(BossModule module) : Components.GenericGaze(module)
         }
     }
 
-    public override void AddGlobalHints(GlobalHints hints)
+    public override void AddGlobalHints(Actor actor, GlobalHints hints)
     {
         if (eyes.Count == 0)
         {
@@ -678,7 +678,7 @@ sealed class CursedShriek(BossModule module) : Components.GenericGaze(module)
             return;
         }
 
-        for (var i = 0; i < players.Count; i++)
+        for (var i = 0; i < players.Count; ++i)
         {
             if ((players[i].expireAt - WorldState.CurrentTime).TotalSeconds > 8d)
             {

@@ -1,8 +1,8 @@
 ﻿namespace BossMod.Dawntrail.Ultimate.DMU;
 
 [ConfigDisplay(Order = 0x400, Parent = typeof(DawntrailConfig))]
-[SkipLocalsInit]
-public sealed class DMUConfig : ConfigNode {
+public sealed class DMUConfig : ConfigNode
+{
 
     // Strategy settings
     [PropertyDisplay("Module warning if party roles assignment are not configured!", tooltip: "The warning will only be displayed before combat starts")]
